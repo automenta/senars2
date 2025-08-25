@@ -8,7 +8,7 @@ import { ActionSubsystem } from './modules/action';
 import { ReflectionModule, ReflectionModuleImpl } from './modules/reflection';
 import { PerceptionSubsystem } from './modules/perception';
 import { CognitiveItem, DerivationStamp, newCognitiveItemId, UUID } from './types';
-import { GOAL_DECOMPOSITION_SCHEMA_ATOM } from './utils';
+import { ALL_SYSTEM_SCHEMAS } from './system-schemas';
 
 type CognitiveCoreModules = {
   attention: AttentionModule;
@@ -35,7 +35,8 @@ export class CognitiveCore {
 
     // Instantiate modules
     const attentionModule = new AttentionModuleImpl();
-    const goalTreeManager = new GoalTreeManagerImpl(worldModel, attentionModule);
+    const schemaMatcher = new SchemaMatcherImpl(worldModel);
+    const goalTreeManager = new GoalTreeManagerImpl(worldModel, attentionModule, schemaMatcher);
     const actionSubsystem = new ActionSubsystem(worldModel); // Pass worldModel to ActionSubsystem
     const reflectionModule = new ReflectionModuleImpl(agenda, worldModel, attentionModule, 60000);
     const perceptionSubsystem = new PerceptionSubsystem(worldModel, attentionModule);
@@ -43,7 +44,7 @@ export class CognitiveCore {
     this.modules = {
       attention: attentionModule,
       resonance: new ResonanceModuleImpl(),
-      matcher: new SchemaMatcherImpl(worldModel),
+      matcher: schemaMatcher,
       goalTree: goalTreeManager,
       action: actionSubsystem,
       reflection: reflectionModule,
@@ -54,10 +55,12 @@ export class CognitiveCore {
   public async initialize(): Promise<void> {
     console.log('Initializing CognitiveCore modules...');
 
-    // Register system schemas
-    this.worldModel.add_atom(GOAL_DECOMPOSITION_SCHEMA_ATOM);
+    // Register all system schemas
+    for (const schemaAtom of ALL_SYSTEM_SCHEMAS) {
+      this.worldModel.add_atom(schemaAtom);
+    }
 
-    // Find all schema atoms and register them with the matcher
+    // Find all schema atoms from the world model and register them with the matcher
     const allAtoms = this.worldModel.get_all_atoms();
     for (const atom of allAtoms) {
       if (atom.meta.type === 'CognitiveSchema') {
@@ -137,7 +140,7 @@ export class CognitiveCore {
    */
   private async handleGoalProcessing(item: CognitiveItem): Promise<boolean> {
     // Attempt to decompose the goal into sub-goals.
-    const subGoals = this.modules.goalTree.decompose(item, this.worldModel, this.modules.attention);
+    const subGoals = this.modules.goalTree.decompose(item);
     if (subGoals.length > 0) {
       subGoals.forEach(subGoal => this.agenda.push(subGoal));
       console.log(`Goal ${item.label ?? item.id} decomposed into ${subGoals.length} sub-goals.`);

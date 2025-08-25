@@ -3,6 +3,7 @@ import { WorldModel } from '../world-model';
 import { jest } from '@jest/globals';
 import { AttentionModule } from './attention';
 import { CognitiveItem, UUID, newCognitiveItemId } from '../types';
+import { SchemaMatcher } from './schema';
 
 // Mock dependencies
 const mockWorldModel = {
@@ -21,6 +22,10 @@ const mockAttentionModule = {
   calculate_derived: jest.fn(() => ({ priority: 0.5, durability: 0.5 })),
   // Add other methods if needed by the code under test
 } as unknown as AttentionModule;
+
+const mockSchemaMatcher = {
+  find_and_apply_decomposition_schemas: jest.fn(() => []),
+} as unknown as SchemaMatcher;
 
 const createGoal = (label: string, dependencies: UUID[] = []): CognitiveItem => ({
   id: newCognitiveItemId(),
@@ -43,7 +48,7 @@ describe('GoalTreeManagerImpl', () => {
   beforeEach(() => {
     // Reset mocks and create a new manager for each test
     jest.clearAllMocks();
-    goalTreeManager = new GoalTreeManagerImpl(mockWorldModel, mockAttentionModule);
+    goalTreeManager = new GoalTreeManagerImpl(mockWorldModel, mockAttentionModule, mockSchemaMatcher);
   });
 
   it('should block a goal if its dependency is not achieved', () => {

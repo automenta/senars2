@@ -1,11 +1,12 @@
-import { CognitiveItem, UUID, newCognitiveItemId } from '../types';
+import { CognitiveItem, PartialCognitiveItem, UUID, newCognitiveItemId } from '../types';
 
 import { AttentionModule } from './attention';
 import { WorldModel } from '../world-model';
+import { SchemaMatcher } from './schema';
 import { GOAL_DECOMPOSITION_SCHEMA_ATOM } from '../utils';
 
 export interface GoalTreeManager {
-  decompose(goal: CognitiveItem, worldModel: WorldModel, attentionModule: AttentionModule): CognitiveItem[];
+  decompose(goal: CognitiveItem): CognitiveItem[];
 
   mark_achieved(goal_id: UUID): CognitiveItem[];
 
@@ -25,69 +26,71 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
   private dependency_to_dependents_map: Map<UUID, Set<UUID>> = new Map();
   private worldModel: WorldModel;
   private attentionModule: AttentionModule;
+  private schemaMatcher: SchemaMatcher;
 
-  constructor(worldModel: WorldModel, attentionModule: AttentionModule) {
+  constructor(worldModel: WorldModel, attentionModule: AttentionModule, schemaMatcher: SchemaMatcher) {
     this.worldModel = worldModel;
     this.attentionModule = attentionModule;
+    this.schemaMatcher = schemaMatcher;
   }
 
-  decompose(goal: CognitiveItem, worldModel: WorldModel, attentionModule: AttentionModule): CognitiveItem[] {
-    const subGoals: CognitiveItem[] = [];
-    const goalLabel = goal.label || '';
+  decompose(goal: CognitiveItem): CognitiveItem[] {
+    // In the next step, this method will be implemented in the schema matcher.
+    const decompositionResults = this.schemaMatcher.find_and_apply_decomposition_schemas?.(goal, this.worldModel);
 
-    // A simple, more generic decomposition strategy based on keywords.
-    if (goalLabel.toLowerCase().startsWith('diagnose')) {
-      const entity = goalLabel.substring('diagnose'.length).trim();
-
-      // Define the chain of goals
-      const goalSpecs = [
-        { label: `Gather information about ${entity}`, dependencies: [] },
-        { label: `Analyze symptoms for ${entity}`, dependencies: [0] }, // Depends on the first goal
-        { label: `Formulate a conclusion for ${entity}`, dependencies: [1] }, // Depends on the second goal
-      ];
-
-      const createdGoals: CognitiveItem[] = [];
-
-      for (const spec of goalSpecs) {
-        const atom = worldModel.find_or_create_atom(
-          `(goal: "${spec.label}")`,
-          { type: 'Fact', source: 'system_schema_decomposition' }
-        );
-
-        // Resolve dependencies based on the indices from the spec
-        const dependencyIds = spec.dependencies.map(index => createdGoals[index].id);
-
-        const subGoal: CognitiveItem = {
-          id: newCognitiveItemId(),
-          atom_id: atom.id,
-          type: 'GOAL',
-          attention: attentionModule.calculate_derived(
-            [goal],
-            GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
-            0.9 // High trust for system decomposition schemas
-          ),
-          stamp: {
-            timestamp: Date.now(),
-            parent_ids: [goal.id],
-            schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
-            module: 'GoalTreeManager',
-          },
-          goal_parent_id: goal.id,
-          goal_status: 'active', // Will be updated by add_goal
-          goal_dependencies: dependencyIds,
-          label: spec.label,
-        };
-
-        this.add_goal(subGoal); // Register the new sub-goal, which will set its status
-        subGoals.push(subGoal);
-        createdGoals.push(subGoal);
-      }
-      console.log(`Decomposed goal "${goalLabel}" into ${subGoals.length} dependent sub-goals.`);
-    } else {
-      console.log(`No generic decomposition strategy found for goal: "${goalLabel}"`);
+    if (!decompositionResults || decompositionResults.length === 0) {
+      console.log(`No decomposition schema found for goal: "${goal.label ?? goal.id}"`);
+      return [];
     }
 
-    return subGoals;
+    const allSubGoals: CognitiveItem[] = [];
+    const createdGoalsById: Map<string, CognitiveItem> = new Map();
+
+    // First pass: create all goals so they can be referenced by dependencies
+    for (const result of decompositionResults) {
+      const { partialItem } = result;
+      const subGoal: CognitiveItem = {
+        ...partialItem,
+        id: newCognitiveItemId(),
+        attention: this.attentionModule.calculate_derived(
+          [goal],
+          result.schema.atom_id,
+          0.9 // High trust for system decomposition schemas
+        ),
+        stamp: {
+          timestamp: Date.now(),
+          parent_ids: [goal.id],
+          schema_id: result.schema.atom_id,
+          module: 'GoalTreeManager',
+        },
+        goal_parent_id: goal.id,
+        goal_status: 'active', // Will be updated by add_goal
+        goal_dependencies: [], // Will be populated next
+      };
+      allSubGoals.push(subGoal);
+      // Use a temporary ID from the partial item if available, otherwise label.
+      const tempId = (partialItem as any).temp_id || partialItem.label;
+      if (tempId) {
+        createdGoalsById.set(tempId, subGoal);
+      }
+    }
+
+    // Second pass: resolve dependencies and add goals to the tree
+    for (const subGoal of allSubGoals) {
+      const partialItem = decompositionResults.find(r => r.partialItem.label === subGoal.label)?.partialItem;
+      const dependencyTempIds = (partialItem as any)?.dependencies || [];
+
+      const dependencyIds = dependencyTempIds.map((tempId: string) => {
+        const dependentGoal = createdGoalsById.get(tempId);
+        return dependentGoal ? dependentGoal.id : null;
+      }).filter((id: UUID | null): id is UUID => id !== null);
+
+      subGoal.goal_dependencies = dependencyIds;
+      this.add_goal(subGoal);
+    }
+
+    console.log(`Decomposed goal "${goal.label}" into ${allSubGoals.length} sub-goals.`);
+    return allSubGoals;
   }
 
   mark_achieved(goal_id: UUID): CognitiveItem[] {
@@ -215,30 +218,34 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
 
   private checkAndPropagateStatus(goal_id: UUID): void {
     const node = this.goal_nodes.get(goal_id);
-    if (!node) return;
-    
-    // If this goal has a parent, check if all siblings have the same status
-    if (node.item.goal_parent_id) {
-      const parentNode = this.goal_nodes.get(node.item.goal_parent_id);
-      if (parentNode) {
-        // Check if all children have the same status
-        const childrenStatuses = Array.from(parentNode.children).map(childId => {
-          const childNode = this.goal_nodes.get(childId);
-          return childNode?.item.goal_status;
-        });
-        
-        // If all children have the same status, propagate to parent
-        const uniqueStatuses = [...new Set(childrenStatuses)];
-        if (uniqueStatuses.length === 1 && uniqueStatuses[0]) {
-          // All children have the same status
-          const parentItem = parentNode.item;
-          parentItem.goal_status = uniqueStatuses[0];
-          console.log(`Parent goal ${parentItem.label ?? parentItem.id} marked as ${uniqueStatuses[0]}.`);
-          
-          // Continue propagating up the tree
-          this.checkAndPropagateStatus(parentItem.id);
-        }
-      }
+    if (!node?.item.goal_parent_id) return;
+
+    const parentNode = this.goal_nodes.get(node.item.goal_parent_id);
+    if (!parentNode) return;
+
+    const childrenStatuses = Array.from(parentNode.children).map(childId => {
+      return this.goal_nodes.get(childId)?.item.goal_status;
+    });
+
+    const parentItem = parentNode.item;
+    const currentParentStatus = parentItem.goal_status;
+    let newParentStatus = currentParentStatus;
+
+    // Rule 1: If any child has failed, the parent fails.
+    if (childrenStatuses.some(status => status === 'failed')) {
+      newParentStatus = 'failed';
+    }
+    // Rule 2: If all children are achieved, the parent is achieved.
+    else if (childrenStatuses.every(status => status === 'achieved')) {
+      newParentStatus = 'achieved';
+    }
+
+    // If the status has changed, update it and propagate the change upwards.
+    if (newParentStatus !== currentParentStatus) {
+      parentItem.goal_status = newParentStatus;
+      console.log(`Parent goal ${parentItem.label ?? parentItem.id} marked as ${newParentStatus}.`);
+      // Continue propagating up the tree
+      this.checkAndPropagateStatus(parentItem.id);
     }
   }
 }

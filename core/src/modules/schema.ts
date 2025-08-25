@@ -1,6 +1,13 @@
 import { CognitiveItem, CognitiveItemType, PartialCognitiveItem, SemanticAtom, UUID } from '../types';
 import { WorldModel } from '../world-model';
 
+export type SubGoal = {
+  temp_id: string; // A temporary, schema-local ID like "step1"
+  label: string;
+  type: CognitiveItemType;
+  dependencies?: string[]; // References to other temp_ids
+};
+
 export type CognitiveSchemaContent = {
   if: {
     a?: { type?: CognitiveItemType; label_pattern?: string; content_pattern?: any };
@@ -13,7 +20,7 @@ export type CognitiveSchemaContent = {
     content_template?: any; // Template for new atom content
     truth?: { frequency: number; confidence: number };
     attention?: { priority: number; durability: number };
-    sub_goals?: Array<{ label: string; type: CognitiveItemType }>; // For goal decomposition schemas
+    sub_goals?: SubGoal[]; // For goal decomposition schemas
   };
 };
 
@@ -28,6 +35,11 @@ export type DerivationResult = {
   schema: CognitiveSchema;
 };
 
+export type DecompositionResult = {
+  partialItem: PartialCognitiveItem;
+  schema: CognitiveSchema;
+};
+
 export interface SchemaMatcher {
   register_schema(schemaAtom: SemanticAtom): void;
   find_and_apply_schemas(
@@ -35,6 +47,10 @@ export interface SchemaMatcher {
     contextItems: CognitiveItem[],
     worldModel: WorldModel,
   ): DerivationResult[];
+  find_and_apply_decomposition_schemas(
+    goal: CognitiveItem,
+    worldModel: WorldModel,
+  ): DecompositionResult[];
 }
 
 export class SchemaMatcherImpl implements SchemaMatcher {
@@ -54,8 +70,11 @@ export class SchemaMatcherImpl implements SchemaMatcher {
   ): DerivationResult[] {
     const results: DerivationResult[] = [];
     for (const schema of this.schemas.values()) {
+      // Skip decomposition schemas
+      if (schema.content.then.sub_goals) continue;
+
       for (const itemB of contextItems) {
-        const bindings = this.getBindings(itemA, itemB, schema, worldModel);
+        const bindings = this.getBinaryBindings(itemA, itemB, schema, worldModel);
         if (bindings) {
           results.push({
             partialItem: this.apply_schema(schema, bindings, worldModel),
@@ -68,7 +87,51 @@ export class SchemaMatcherImpl implements SchemaMatcher {
     return results;
   }
 
-  private getBindings(a: CognitiveItem, b: CognitiveItem, schema: CognitiveSchema, worldModel: WorldModel): Record<string, any> | null {
+  public find_and_apply_decomposition_schemas(
+    goal: CognitiveItem,
+    worldModel: WorldModel,
+  ): DecompositionResult[] {
+    const results: DecompositionResult[] = [];
+    for (const schema of this.schemas.values()) {
+      // Only consider schemas with a `sub_goals` clause
+      if (!schema.content.then.sub_goals) continue;
+
+      const bindings = this.getUnaryBindings(goal, schema, worldModel);
+      if (bindings) {
+        const partialItems = this.apply_decomposition_schema(schema, bindings, worldModel);
+        for (const partialItem of partialItems) {
+          results.push({
+            partialItem,
+            schema,
+          });
+        }
+      }
+    }
+    return results;
+  }
+
+  private getUnaryBindings(item: CognitiveItem, schema: CognitiveSchema, worldModel: WorldModel): Record<string, any> | null {
+    const atom = worldModel.get_atom(item.atom_id);
+    if (!atom) return null;
+
+    const pattern = schema.content.if.a;
+    // Ensure it's a unary schema (no 'b' condition)
+    if (!pattern || schema.content.if.b) return null;
+
+    if (pattern.type && item.type !== pattern.type) return null;
+
+    const bindings = pattern.content_pattern ? this.matchPattern(pattern.content_pattern, atom.content) : {};
+    if (!bindings) return null;
+
+    // Also try to match against the label
+    const labelBindings = pattern.label_pattern ? this.matchPattern(pattern.label_pattern, item.label || "") : {};
+    if(!labelBindings) return null;
+
+    return { ...bindings, ...labelBindings };
+  }
+
+  private getBinaryBindings(a: CognitiveItem, b: CognitiveItem, schema: CognitiveSchema, worldModel: WorldModel): Record<string, any> | null {
+  private getBinaryBindings(a: CognitiveItem, b: CognitiveItem, schema: CognitiveSchema, worldModel: WorldModel): Record<string, any> | null {
     const atomA = worldModel.get_atom(a.atom_id);
     const atomB = worldModel.get_atom(b.atom_id);
     if (!atomA || !atomB) return null;
@@ -103,6 +166,33 @@ export class SchemaMatcherImpl implements SchemaMatcher {
       label: this.applyTemplate(thenClause.label_template || '', bindings),
       truth: thenClause.truth || { frequency: 1.0, confidence: 0.8 },
     };
+  }
+
+  private apply_decomposition_schema(schema: CognitiveSchema, bindings: Record<string, any>, worldModel: WorldModel): PartialCognitiveItem[] {
+    const thenClause = schema.content.then;
+    if (!thenClause.sub_goals) return [];
+
+    const partialItems: PartialCognitiveItem[] = [];
+    for (const subGoalTemplate of thenClause.sub_goals) {
+      const newLabel = this.applyTemplate(subGoalTemplate.label, bindings);
+      const newAtomContent = `(goal: "${newLabel}")`; // Simple content for now
+      const newAtom = worldModel.find_or_create_atom(newAtomContent, {
+        type: 'Fact',
+        source: `schema:${schema.atom_id}`,
+      });
+
+      const partialItem: PartialCognitiveItem & { temp_id: string, dependencies?: string[] } = {
+        atom_id: newAtom.id,
+        type: subGoalTemplate.type,
+        label: newLabel,
+        goal_status: 'active', // Initial status
+        temp_id: subGoalTemplate.temp_id,
+        dependencies: subGoalTemplate.dependencies,
+      };
+      partialItems.push(partialItem);
+    }
+
+    return partialItems;
   }
 
   private matchPattern(pattern: string, value: any, initialBindings: Record<string, any> = {}): Record<string, any> | null {

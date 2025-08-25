@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest src/agenda.test.ts",
+    "test": "jest",
     "build": "tsc",
     "start": "ts-node src/server.ts"
   },
