@@ -200,26 +200,46 @@ app.post('/api/goal/:id/achieve', (req, res) => {
 });
 
 // --- New Goal Composition Endpoint ---
-const goalComposer = new GoalCompositionModule();
-
 app.get('/api/reflection', (req, res) => {
     const reflectionData = cognitiveCore.getModules().reflection.getReflectionData();
     res.json(reflectionData);
 });
 
-app.post('/api/compose-goal', (req, res) => {
-  const { text } = req.body;
-  if (!text) {
-    return res.status(400).json({ error: 'Missing text in request body.' });
-  }
-  try {
-    const composition = goalComposer.compose({ text });
-    res.json(composition);
-  } catch (error) {
-    console.error('Error composing goal:', error);
-    res.status(500).json({ error: 'Failed to compose goal.' });
-  }
-});
+app.post('/api/compose-goal', async (req, res) => {
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: 'Missing text in request body.' });
+    }
+    try {
+      // 1. Use the integrated module to compose the goal
+      const composition = cognitiveCore.getModules().goalComposition.compose({ text });
+
+      // 2. Use the perception subsystem to create the basic cognitive item
+      const goalText = `GOAL: ${composition.suggestedGoal}`;
+      const newItems = await perception.process(goalText);
+
+      if (!newItems || newItems.length === 0) {
+        return res.status(500).json({ error: 'Failed to create a cognitive item for the composed goal.' });
+      }
+
+      const composedGoalItem = newItems[0];
+
+      // 3. Enhance the item with the composition results
+      composedGoalItem.label = composition.suggestedGoal; // Ensure label is set
+      composedGoalItem.attention.priority = composition.priority; // Override priority
+      if (composition.constraints) {
+        composedGoalItem.constraints = composition.constraints; // Add constraints
+      }
+
+      // 4. Push the fully formed goal to the agenda
+      agenda.push(composedGoalItem);
+
+      res.status(200).json({ message: 'Goal composed and added to agenda.', item: composedGoalItem });
+    } catch (error) {
+      console.error('Error composing goal:', error);
+      res.status(500).json({ error: 'Failed to compose goal.' });
+    }
+  });
 
 app.post('/api/sandbox/run', async (req, res) => {
     const { hypothesis, steps } = req.body;

@@ -75,6 +75,17 @@ export type DerivationStamp = {
  */
 export type CognitiveItemType = 'BELIEF' | 'GOAL' | 'QUERY';
 
+/**
+ * Defines specific constraints for how a GOAL should be pursued.
+ */
+export type GoalConstraints = {
+  /**
+   * Specifies required sources and their minimum trust scores.
+   * The key is the source name (e.g., 'vetdb.org') and the value is the minimum required trust score (e.g., 0.9).
+   */
+  required_sources?: Record<string, number>;
+};
+
 export type CognitiveItem = {
   id: UUID;
   atom_id: UUID;               // Reference to a SemanticAtom
@@ -89,10 +100,11 @@ export type CognitiveItem = {
   goal_dependencies?: UUID[]; // New field for dependencies
   goal_estimated_completion_time?: number; // in milliseconds from now
   goal_confidence_projection?: number; // a value between 0 and 1
+  constraints?: GoalConstraints; // New field for goal-specific constraints
 
   // Optional, human-readable label
   label?: string;
 };
 
 // A partial item, usually created by a schema, before it is finalized with attention and a full stamp by the cognitive core.
-export type PartialCognitiveItem = Pick<CognitiveItem, 'atom_id' | 'type' | 'truth' | 'goal_parent_id' | 'goal_status' | 'goal_dependencies' | 'label' | 'stamp' | 'goal_estimated_completion_time' | 'goal_confidence_projection'>;
+export type PartialCognitiveItem = Pick<CognitiveItem, 'atom_id' | 'type' | 'truth' | 'goal_parent_id' | 'goal_status' | 'goal_dependencies' | 'label' | 'stamp' | 'goal_estimated_completion_time' | 'goal_confidence_projection' | 'constraints'>;

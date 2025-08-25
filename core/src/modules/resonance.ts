@@ -89,6 +89,18 @@ export class ResonanceModuleImpl implements ResonanceModule {
     if (targetItem.type === candidateItem.type) {
       score += 0.1;
     }
+
+    // 6. Constraint Compliance boost (0-0.5, strong boost)
+    if (targetItem.type === 'GOAL' && targetItem.constraints?.required_sources) {
+        const requiredSources = targetItem.constraints.required_sources;
+        const candidateSource = atom?.meta.source;
+        const candidateTrust = atom?.meta.trust_score ?? 0;
+
+        if (candidateSource && requiredSources[candidateSource] && candidateTrust >= requiredSources[candidateSource]) {
+            // Give a strong boost if the source is required and meets the trust threshold
+            score += 0.5;
+        }
+    }
     
     return score;
   }

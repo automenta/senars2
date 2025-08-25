@@ -8,6 +8,7 @@ import { ActionSubsystem } from './modules/action.js';
 import { ReflectionModule, ReflectionModuleImpl } from './modules/reflection.js';
 import { PerceptionSubsystem } from './modules/perception.js';
 import { PredictiveModelingModule, PredictiveModelingModuleImpl } from './modules/predictive-modeling.js';
+import { GoalCompositionModule } from './modules/goal-composition.js';
 import { CognitiveItem, DerivationStamp, newCognitiveItemId, UUID } from './types.js';
 import { ALL_SYSTEM_SCHEMAS } from './system-schemas.js';
 
@@ -20,6 +21,7 @@ type CognitiveCoreModules = {
   reflection: ReflectionModule;
   perception: PerceptionSubsystem;
   prediction: PredictiveModelingModule;
+  goalComposition: GoalCompositionModule;
 };
 
 export class CognitiveCore {
@@ -43,6 +45,7 @@ export class CognitiveCore {
     const actionSubsystem = new ActionSubsystem(worldModel); // Pass worldModel to ActionSubsystem
     const reflectionModule = new ReflectionModuleImpl(agenda, worldModel, attentionModule, 60000);
     const perceptionSubsystem = new PerceptionSubsystem(worldModel, attentionModule);
+    const goalCompositionModule = new GoalCompositionModule(worldModel);
 
     this.modules = {
       attention: attentionModule,
@@ -53,6 +56,7 @@ export class CognitiveCore {
       reflection: reflectionModule,
       perception: perceptionSubsystem,
       prediction: predictionModule,
+      goalComposition: goalCompositionModule,
     };
   }
 
