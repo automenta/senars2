@@ -1,7 +1,11 @@
 # Cognitive Agent UI: Refined & Integrated Design
 
 ## Core Design Evolution
-Transform the cognitive architecture into an **integrated cognitive workspace** that balances intuitive task management with deep reasoning transparency. This iteration focuses on **seamless integration**, **progressive disclosure**, and **actionable metacognition**, creating a unified experience where users can both manage goals and understand the underlying reasoning.
+
+Transform the cognitive architecture into an **integrated cognitive workspace** that balances intuitive task management
+with deep reasoning transparency. This iteration focuses on **seamless integration**, **progressive disclosure**, and *
+*actionable metacognition**, creating a unified experience where users can both manage goals and understand the
+underlying reasoning.
 
 ---
 
@@ -70,16 +74,17 @@ Transform the cognitive architecture into an **integrated cognitive workspace** 
 
 Integrated status indicators that reflect the complete cognitive lifecycle:
 
-| Status | Visual | Meaning | Context |
-|--------|--------|-------|---------|
-| `🎯` | Blue target | Active goal | Priority-driven processing |
-| `🔍` | Orange magnifier | Active query | Context gathering phase |
-| `✅` | Green check | Verified belief | High-confidence knowledge |
-| `⚠️` | Amber warning | Blocked/uncertain | Requires attention |
-| `⏳` | Gray clock | Scheduled/pending | Future activation |
-| `🔗` | Blue chain | Highly connected | Core knowledge element |
+| Status | Visual           | Meaning           | Context                    |
+|--------|------------------|-------------------|----------------------------|
+| `🎯`   | Blue target      | Active goal       | Priority-driven processing |
+| `🔍`   | Orange magnifier | Active query      | Context gathering phase    |
+| `✅`    | Green check      | Verified belief   | High-confidence knowledge  |
+| `⚠️`   | Amber warning    | Blocked/uncertain | Requires attention         |
+| `⏳`    | Gray clock       | Scheduled/pending | Future activation          |
+| `🔗`   | Blue chain       | Highly connected  | Core knowledge element     |
 
 **Progressive Status Evolution**:
+
 ```
 [+] → [🔍 Query] → [🎯 Goal] → [✅ Belief] → [🔗 Core Knowledge]
 ```
@@ -115,12 +120,14 @@ Enhanced goal creation with cognitive intelligence:
 Context-sensitive provenance that adapts to user needs:
 
 **Compact View** (Default):
+
 ```
 BELIEF: Chocolate contains theobromine (0.92)
 ↳ Source: vetdb.org (0.95) • Schema: ChemicalComposition (0.92)
 ```
 
 **Expanded View** (Hover/Click):
+
 ```
 BELIEF: (chocolate has theobromine)
 │
@@ -180,12 +187,14 @@ Seamless integration of metacognitive insights:
 Smart visualization switching based on cognitive context:
 
 **Automatic Mode** (Default):
+
 - Shows appropriate view based on item type and user role
 - Goals: Hierarchical list
 - Beliefs: Provenance-focused
 - Queries: Context network
 
 **Manual Controls**:
+
 ```
 [📊 Views] 
 ├── List (Default) 
@@ -196,6 +205,7 @@ Smart visualization switching based on cognitive context:
 ```
 
 **Graph View Example**:
+
 ```plaintext
 [Diagnose cat illness]
 │
@@ -234,6 +244,7 @@ GOAL: Diagnose cat illness
 ```
 
 **Predictive Features**:
+
 - Estimated completion times based on historical performance
 - Confidence projections for pending verifications
 - Impact analysis for dependency changes
@@ -276,31 +287,35 @@ Tightly integrated experimentation environment:
 ## Interaction Design Principles
 
 ### 1. **Progressive Disclosure**
+
 - **Level 1**: Simple task management view
-- **Level 2**: Cognitive status and basic provenance  
+- **Level 2**: Cognitive status and basic provenance
 - **Level 3**: Full derivation path and trust calculations
 - **Level 4**: System-level impact and metacognitive insights
 
 ### 2. **Contextual Intelligence**
+
 - Automatically adjusts detail level based on:
-  - User role (expert vs. novice)
-  - Cognitive load
-  - Item criticality
-  - Time since last interaction
+    - User role (expert vs. novice)
+    - Cognitive load
+    - Item criticality
+    - Time since last interaction
 
 ### 3. **Action-Oriented Design**
+
 Every cognitive state leads to clear actions:
 
-| State | Suggested Actions |
-|-------|-------------------|
-| **Blocked Goal** | Provide input, modify dependencies, re-prioritize |
+| State                  | Suggested Actions                                    |
+|------------------------|------------------------------------------------------|
+| **Blocked Goal**       | Provide input, modify dependencies, re-prioritize    |
 | **High-Contradiction** | Resolve conflicts, adjust trust, investigate sources |
-| **Memory Pressure** | Compact, archive, or expand storage |
-| **New Belief** | Confirm, apply to goals, or challenge |
+| **Memory Pressure**    | Compact, archive, or expand storage                  |
+| **New Belief**         | Confirm, apply to goals, or challenge                |
 
 ### 4. **Trust-Aware Workflows**
+
 - **High-trust sources**: Automatic integration with notification
-- **Medium-trust sources**: Require confirmation for critical decisions  
+- **Medium-trust sources**: Require confirmation for critical decisions
 - **Low-trust sources**: Flagged for review, limited influence on reasoning
 
 ---
@@ -309,16 +324,17 @@ Every cognitive state leads to clear actions:
 
 ### Color & Typography
 
-| Element | Color | Typography | Size |
-|--------|-------|------------|------|
-| **High Priority** | #2563EB (deep blue) | Semibold | 14px |
-| **Medium Priority** | #059669 (emerald) | Regular | 14px |
-| **Low Priority** | #6B7280 (gray) | Regular | 13px |
-| **Trust Badges** | Gradient: red → green | Monospace | 11px |
-| **Provenance** | #4B5563 (cool gray) | Italic | 12px |
-| **System Items** | #7C3AED (purple) | Monospace | 13px |
+| Element             | Color                 | Typography | Size |
+|---------------------|-----------------------|------------|------|
+| **High Priority**   | #2563EB (deep blue)   | Semibold   | 14px |
+| **Medium Priority** | #059669 (emerald)     | Regular    | 14px |
+| **Low Priority**    | #6B7280 (gray)        | Regular    | 13px |
+| **Trust Badges**    | Gradient: red → green | Monospace  | 11px |
+| **Provenance**      | #4B5563 (cool gray)   | Italic     | 12px |
+| **System Items**    | #7C3AED (purple)      | Monospace  | 13px |
 
 ### Icon System
+
 - **Goals**: 🎯 Target (active), 🎯⚪ Outline (pending)
 - **Queries**: 🔍 Magnifier (active), 🔍⚪ Outline (resolved)
 - **Beliefs**: ✅ Check (high confidence), ⚠️ Triangle (medium), ❌ Cross (low)
@@ -329,35 +345,38 @@ Every cognitive state leads to clear actions:
 ## Why This Design Represents the Cognitive Architecture
 
 1. **True Goal-Agentic Flow**
-   - Hierarchical goals with automatic decomposition
-   - Status propagation through dependency chains
-   - Predictive completion estimates
+    - Hierarchical goals with automatic decomposition
+    - Status propagation through dependency chains
+    - Predictive completion estimates
 
 2. **Verifiable Provenance by Design**
-   - One-click access to full derivation paths
-   - Transparent trust calculations
-   - Visual contradiction resolution
+    - One-click access to full derivation paths
+    - Transparent trust calculations
+    - Visual contradiction resolution
 
 3. **Integrated Metacognition**
-   - System health monitoring as first-class citizen
-   - Actionable recommendations based on KPIs
-   - Cognitive load awareness
+    - System health monitoring as first-class citizen
+    - Actionable recommendations based on KPIs
+    - Cognitive load awareness
 
 4. **Trust-Aware Reasoning**
-   - Source trust scores integrated into priority calculations
-   - Confidence propagation through reasoning chains
-   - Anomaly detection for low-trust patterns
+    - Source trust scores integrated into priority calculations
+    - Confidence propagation through reasoning chains
+    - Anomaly detection for low-trust patterns
 
 5. **Hybrid Cognition Embodiment**
-   - Symbolic representations (structured goals, schemas)
-   - Semantic representations (confidence scores, trust weights)
-   - Seamless switching between views
+    - Symbolic representations (structured goals, schemas)
+    - Semantic representations (confidence scores, trust weights)
+    - Seamless switching between views
 
 6. **Concurrency Made Intuitive**
-   - Parallel cognitive threads with clear status
-   - Visual blocking conditions and dependencies
-   - Resource utilization awareness
+    - Parallel cognitive threads with clear status
+    - Visual blocking conditions and dependencies
+    - Resource utilization awareness
 
 ---
 
-This refined design creates a **cohesive cognitive workspace** where the TODO-list paradigm serves as both a familiar interface and a powerful window into the agent's reasoning processes. The system doesn't just present tasks—it reveals the **why**, **how**, and **how certain** behind every cognitive item, making advanced AI reasoning transparent, trustworthy, and actionable.
+This refined design creates a **cohesive cognitive workspace** where the TODO-list paradigm serves as both a familiar
+interface and a powerful window into the agent's reasoning processes. The system doesn't just present tasks—it reveals
+the **why**, **how**, and **how certain** behind every cognitive item, making advanced AI reasoning transparent,
+trustworthy, and actionable.

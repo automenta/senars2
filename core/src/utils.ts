@@ -12,7 +12,7 @@ import { SemanticAtom, UUID } from './types';
  */
 export const createSemanticAtomId = (
   content: any,
-  meta: Omit<SemanticAtom['meta'], 'id'>
+  meta: Omit<SemanticAtom['meta'], 'id'>,
 ): UUID => {
   const hash = createHash('sha256');
 
@@ -23,8 +23,8 @@ export const createSemanticAtomId = (
   if (contentString === undefined || metaString === undefined) {
     // This can happen if the content or meta contains functions or other non-serializable data.
     // A robust system might have a more graceful way to handle this.
-    console.error("Attempted to create an ID for non-serializable content.", { content, meta });
-    throw new Error("Cannot create ID for non-serializable content or metadata.");
+    console.error('Attempted to create an ID for non-serializable content.', { content, meta });
+    throw new Error('Cannot create ID for non-serializable content or metadata.');
   }
 
   hash.update(contentString + metaString);

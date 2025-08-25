@@ -2,20 +2,14 @@ import { HierarchicalNSW } from 'hnswlib-node';
 import stableStringify from 'json-stable-stringify';
 import { isPlainObject } from 'lodash';
 import { JSONPath } from 'jsonpath-plus';
-import {
-  SemanticAtom,
-  CognitiveItem,
-  UUID,
-  TruthValue,
-  newCognitiveItemId,
-  SemanticAtomMetadata,
-} from './types';
+import { CognitiveItem, newCognitiveItemId, SemanticAtom, SemanticAtomMetadata, TruthValue, UUID } from './types';
 import { createSemanticAtomId } from './utils';
 
 // --- Interfaces and Default Implementations ---
 
 export interface BeliefRevisionEngine {
   merge(existing: TruthValue, neu: TruthValue): TruthValue;
+
   detect_conflict(a: TruthValue, b: TruthValue): boolean;
 }
 
@@ -55,19 +49,25 @@ export type CognitiveSchema = {
 
 export interface WorldModel {
   add_atom(atom: SemanticAtom): UUID;
+
   add_item(item: CognitiveItem): void;
 
   get_atom(id: UUID): SemanticAtom | null;
+
   get_item(id: UUID): CognitiveItem | null;
+
   update_item(id: UUID, item: CognitiveItem): void;
 
   find_or_create_atom(content: any, partial_meta: Partial<SemanticAtomMetadata>): SemanticAtom;
 
   query_by_semantic(embedding: number[], k: number): CognitiveItem[];
+
   query_by_symbolic(pattern: any, k?: number): CognitiveItem[];
+
   query_by_structure(pattern: string, k?: number): CognitiveItem[];
 
   revise_belief(new_item: CognitiveItem): CognitiveItem | null;
+
   register_schema_atom(atom: SemanticAtom): CognitiveSchema | null;
 }
 
@@ -155,9 +155,9 @@ export class WorldModelImpl implements WorldModel {
 
   update_item(id: UUID, item: CognitiveItem): void {
     if (!this.items.has(id)) {
-        // In a real system, we might throw an error or handle this differently.
-        // For now, we'll log a warning and add it as a new item.
-        console.warn(`Attempted to update non-existent item with ID ${id}. Adding it instead.`);
+      // In a real system, we might throw an error or handle this differently.
+      // For now, we'll log a warning and add it as a new item.
+      console.warn(`Attempted to update non-existent item with ID ${id}. Adding it instead.`);
     }
     this.items.set(id, item);
   }
@@ -170,13 +170,13 @@ export class WorldModelImpl implements WorldModel {
 
     const resultAtoms: SemanticAtom[] = [];
     for (const label of neighbors) {
-        const atomId = this.hnswLabelToAtomId.get(label);
-        if (atomId) {
-            const atom = this.get_atom(atomId);
-            if (atom) {
-                resultAtoms.push(atom);
-            }
+      const atomId = this.hnswLabelToAtomId.get(label);
+      if (atomId) {
+        const atom = this.get_atom(atomId);
+        if (atom) {
+          resultAtoms.push(atom);
         }
+      }
     }
 
     const resultItems: CognitiveItem[] = [];
@@ -273,19 +273,19 @@ export class WorldModelImpl implements WorldModel {
     }
 
     const meta: SemanticAtomMetadata = {
-        type: "Fact", // Default type
-        ...partial_meta,
-        timestamp: partial_meta.timestamp || new Date().toISOString(),
+      type: 'Fact', // Default type
+      ...partial_meta,
+      timestamp: partial_meta.timestamp || new Date().toISOString(),
     };
 
     // Embedding would be calculated here by an external service/model
     const embedding: number[] = []; // Placeholder
 
     const newAtom: SemanticAtom = {
-        id: createSemanticAtomId(content, meta),
-        content,
-        embedding,
-        meta,
+      id: createSemanticAtomId(content, meta),
+      content,
+      embedding,
+      meta,
     };
 
     this.add_atom(newAtom);
@@ -309,12 +309,12 @@ export class WorldModelImpl implements WorldModel {
     }
 
     let existingItem: CognitiveItem | null = null;
-    for(const itemId of itemsToSearch) {
-        const item = this.get_item(itemId);
-        if(item && item.type === 'BELIEF') {
-            existingItem = item;
-            break;
-        }
+    for (const itemId of itemsToSearch) {
+      const item = this.get_item(itemId);
+      if (item && item.type === 'BELIEF') {
+        existingItem = item;
+        break;
+      }
     }
 
     if (!existingItem || !existingItem.truth) {
@@ -324,7 +324,7 @@ export class WorldModelImpl implements WorldModel {
 
     const mergedTruth = this.beliefRevisionEngine.merge(
       existingItem.truth,
-      new_item.truth
+      new_item.truth,
     );
 
     const updatedItem: CognitiveItem = {
@@ -343,7 +343,7 @@ export class WorldModelImpl implements WorldModel {
   register_schema_atom(atom: SemanticAtom): CognitiveSchema | null {
     if (atom.meta.type !== 'CognitiveSchema') {
       console.error(
-        `Attempted to register atom ${atom.id} as a schema, but its type is ${atom.meta.type}`
+        `Attempted to register atom ${atom.id} as a schema, but its type is ${atom.meta.type}`,
       );
       return null;
     }

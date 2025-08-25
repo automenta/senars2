@@ -1,11 +1,5 @@
-import { WorldModelImpl, DefaultBeliefRevisionEngine } from './world-model';
-import {
-  SemanticAtom,
-  CognitiveItem,
-  newCognitiveItemId,
-  UUID,
-  TruthValue,
-} from './types';
+import { DefaultBeliefRevisionEngine, WorldModelImpl } from './world-model';
+import { CognitiveItem, newCognitiveItemId, SemanticAtom, TruthValue, UUID } from './types';
 import { createSemanticAtomId } from './utils';
 
 const EMBEDDING_DIM = 10;
@@ -26,7 +20,7 @@ const createAtom = (content: any, embedding: number[] = []): SemanticAtom => {
 const createBelief = (
   atom_id: UUID,
   truth: TruthValue,
-  id: UUID = newCognitiveItemId()
+  id: UUID = newCognitiveItemId(),
 ): CognitiveItem => ({
   id,
   atom_id,
@@ -185,7 +179,7 @@ describe('WorldModelImpl', () => {
     const createItem = (
       atom: SemanticAtom,
       type: 'GOAL' | 'BELIEF' | 'QUERY',
-      label: string
+      label: string,
     ): CognitiveItem => ({
       id: newCognitiveItemId(),
       atom_id: atom.id,

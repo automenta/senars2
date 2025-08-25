@@ -11,7 +11,7 @@ export const newCognitiveItemId = (): UUID => randomUUID() as UUID;
 
 // --- Semantic Atom: Immutable Knowledge Unit ---
 
-export type SemanticAtomType = "Fact" | "CognitiveSchema" | "Observation" | "Rule";
+export type SemanticAtomType = 'Fact' | 'CognitiveSchema' | 'Observation' | 'Rule';
 
 /**
  * Standardized metadata for a SemanticAtom.
@@ -34,10 +34,10 @@ export type SemanticAtomMetadata = {
  * The 'id' is a SHA-256 hash of its content and metadata.
  */
 export type SemanticAtom = {
-    id: UUID;
-    content: any; // e.g., S-expression, JSON, text, URI
-    embedding: number[]; // Dense vector
-    meta: SemanticAtomMetadata;
+  id: UUID;
+  content: any; // e.g., S-expression, JSON, text, URI
+  embedding: number[]; // Dense vector
+  meta: SemanticAtomMetadata;
 };
 
 
@@ -47,26 +47,26 @@ export type SemanticAtom = {
  * Represents the truthiness of a BELIEF item.
  */
 export type TruthValue = {
-    frequency: number;    // [0.0, 1.0] — empirical support
-    confidence: number;   // [0.0, 1.0] — epistemic certainty
+  frequency: number;    // [0.0, 1.0] — empirical support
+  confidence: number;   // [0.0, 1.0] — epistemic certainty
 };
 
 /**
  * Represents the salience and retention value of a CognitiveItem.
  */
 export type AttentionValue = {
-    priority: number;     // [0.0, 1.0] — short-term salience
-    durability: number;   // [0.0, 1.0] — long-term retention value
+  priority: number;     // [0.0, 1.0] — short-term salience
+  durability: number;   // [0.0, 1.0] — long-term retention value
 };
 
 /**
  * Records the provenance of a CognitiveItem, tracing how it was derived.
  */
 export type DerivationStamp = {
-    timestamp: number;           // Unix ms
-    parent_ids: UUID[];          // Input CognitiveItem IDs
-    schema_id: UUID;             // Rule/schema used
-    module?: string;             // Optional: "resonance", "analogy"
+  timestamp: number;           // Unix ms
+  parent_ids: UUID[];          // Input CognitiveItem IDs
+  schema_id: UUID;             // Rule/schema used
+  module?: string;             // Optional: "resonance", "analogy"
 };
 
 /**
@@ -76,17 +76,17 @@ export type DerivationStamp = {
 export type CognitiveItemType = 'BELIEF' | 'GOAL' | 'QUERY';
 
 export type CognitiveItem = {
-    id: UUID;
-    atom_id: UUID;               // Reference to a SemanticAtom
-    type: CognitiveItemType;
-    truth?: TruthValue;          // Only for BELIEF items
-    attention: AttentionValue;
-    stamp: DerivationStamp;
+  id: UUID;
+  atom_id: UUID;               // Reference to a SemanticAtom
+  type: CognitiveItemType;
+  truth?: TruthValue;          // Only for BELIEF items
+  attention: AttentionValue;
+  stamp: DerivationStamp;
 
-    // Optional fields for goal management
-    goal_parent_id?: UUID;
-    goal_status?: "active" | "blocked" | "achieved" | "failed";
+  // Optional fields for goal management
+  goal_parent_id?: UUID;
+  goal_status?: 'active' | 'blocked' | 'achieved' | 'failed';
 
-    // Optional, human-readable label
-    label?: string;
+  // Optional, human-readable label
+  label?: string;
 };
