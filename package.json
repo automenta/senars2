@@ -4,8 +4,9 @@
   "private": true,
   "description": "A verifiable, goal-directed reasoning system.",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "start-core": "ts-node core/src/main.ts",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "build:core": "node_modules/.bin/tsc -p core/tsconfig.json"
   },
   "keywords": [],
@@ -27,6 +28,7 @@
   },
   "dependencies": {
     "@types/lodash": "^4.17.20",
+    "jsonpath-plus": "^10.3.0",
     "lodash": "^4.17.21"
   }
 }

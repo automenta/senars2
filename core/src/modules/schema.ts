@@ -77,7 +77,7 @@ export class SchemaMatcherImpl implements SchemaMatcher {
         const bindings = this.getBinaryBindings(itemA, itemB, schema, worldModel);
         if (bindings) {
           results.push({
-            partialItem: this.apply_schema(schema, bindings, worldModel),
+            partialItem: this.apply_schema(schema, bindings, worldModel, itemA, itemB),
             parentItems: [itemA, itemB],
             schema,
           });
@@ -151,16 +151,26 @@ export class SchemaMatcherImpl implements SchemaMatcher {
     return { ...bindingsA, ...bindingsB };
   }
 
-  private apply_schema(schema: CognitiveSchema, bindings: Record<string, any>, worldModel: WorldModel): PartialCognitiveItem {
+  private apply_schema(schema: CognitiveSchema, bindings: Record<string, any>, worldModel: WorldModel, itemA: CognitiveItem, itemB: CognitiveItem): PartialCognitiveItem {
     const thenClause = schema.content.then;
-    const newContent = this.applyTemplate(thenClause.content_template, bindings);
-    const newAtom = worldModel.find_or_create_atom(newContent, {
-      type: 'Fact',
-      source: `schema:${schema.atom_id}`,
-      trust_score: 0.8,
-    });
+    let derivedAtomId: UUID;
+
+    if (thenClause.atom_id_from === 'a') {
+      derivedAtomId = itemA.atom_id;
+    } else if (thenClause.atom_id_from === 'b') {
+      derivedAtomId = itemB.atom_id;
+    } else {
+      const newContent = this.applyTemplate(thenClause.content_template, bindings);
+      const newAtom = worldModel.find_or_create_atom(newContent, {
+        type: 'Fact',
+        source: `schema:${schema.atom_id}`,
+        trust_score: 0.8,
+      });
+      derivedAtomId = newAtom.id;
+    }
+
     return {
-      atom_id: newAtom.id,
+      atom_id: derivedAtomId,
       type: thenClause.type,
       label: this.applyTemplate(thenClause.label_template || '', bindings),
       truth: thenClause.truth || { frequency: 1.0, confidence: 0.8 },

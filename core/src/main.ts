@@ -2,7 +2,7 @@ import { AgendaImpl } from './agenda.js';
 import { WorldModelImpl } from './world-model.js';
 import { CognitiveCore } from './cognitive-core.js';
 import { CognitiveItem, UUID } from './types.js';
-import { GOAL_DECOMPOSITION_SCHEMA_ATOM } from './system-schemas.js';
+import { DIAGNOSE_TOXICITY_SCHEMA_ATOM } from './system-schemas.js';
 import { PerceptionSubsystem } from './modules/perception.js';
 
 async function main() {
@@ -32,30 +32,20 @@ async function main() {
     trust_score: 0.6,
   });
 
-  const initialGoalItems = await perception.process("GOAL: Diagnose cat illness");
+  // The new perception system can now parse metadata from the input string.
+  const initialGoalItems = await perception.process(
+    `GOAL: Diagnose cat illness { "schema_id": "${DIAGNOSE_TOXICITY_SCHEMA_ATOM.id}" }`
+  );
   if (initialGoalItems.length > 0) {
-    const initialGoal = initialGoalItems[0];
-    // Manually set a different schema for decomposition, as the original code did.
-    initialGoal.stamp.schema_id = GOAL_DECOMPOSITION_SCHEMA_ATOM.id;
-    agenda.push(initialGoal);
+    agenda.push(initialGoalItems[0]);
   }
 
-  // Example 2: A simple belief
-  const factBeliefItems = await perception.process("BELIEF: (is_toxic_to chocolate dog)");
+  // Example 2: A simple belief with source and trust metadata.
+  const factBeliefItems = await perception.process(
+    `BELIEF: (is_toxic_to chocolate dog) { "source": "vetdb.org", "trust_score": 0.95, "confidence": 0.95 }`
+  );
   if (factBeliefItems.length > 0) {
-    const factBelief = factBeliefItems[0];
-    // Manually update trust/confidence as the original code did
-    if (factBelief.truth) {
-      factBelief.truth.confidence = 0.95;
-    }
-    const factAtom = worldModel.get_atom(factBelief.atom_id);
-    if (factAtom) {
-      factAtom.meta.source = 'vetdb.org';
-      factAtom.meta.trust_score = 0.95;
-    }
-    // Recalculate attention with the new confidence
-    factBelief.attention = cognitiveCore.getModules().attention.calculate_initial(factBelief);
-    agenda.push(factBelief);
+    agenda.push(factBeliefItems[0]);
   }
 
   console.log('Initial items pushed to Agenda.');

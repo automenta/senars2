@@ -4,6 +4,7 @@ import { jest } from '@jest/globals';
 import { AttentionModule } from './attention.js';
 import { CognitiveItem, UUID, newCognitiveItemId } from '../types.js';
 import { SchemaMatcher } from './schema.js';
+import { PredictiveModelingModule } from './predictive-modeling.js';
 
 // Mock dependencies
 const mockWorldModel = {
@@ -27,6 +28,10 @@ const mockSchemaMatcher = {
   find_and_apply_decomposition_schemas: jest.fn(() => []),
 } as unknown as SchemaMatcher;
 
+const mockPredictionModule = {
+    estimate_goal_completion: jest.fn(() => ({ time: 1000, confidence: 0.9 })),
+} as unknown as PredictiveModelingModule;
+
 const createGoal = (label: string, dependencies: UUID[] = []): CognitiveItem => ({
   id: newCognitiveItemId(),
   atom_id: newCognitiveItemId(),
@@ -48,7 +53,7 @@ describe('GoalTreeManagerImpl', () => {
   beforeEach(() => {
     // Reset mocks and create a new manager for each test
     jest.clearAllMocks();
-    goalTreeManager = new GoalTreeManagerImpl(mockWorldModel, mockAttentionModule, mockSchemaMatcher);
+    goalTreeManager = new GoalTreeManagerImpl(mockWorldModel, mockAttentionModule, mockSchemaMatcher, mockPredictionModule);
   });
 
   it('should block a goal if its dependency is not achieved', () => {

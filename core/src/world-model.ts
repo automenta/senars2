@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import stableStringify from 'json-stable-stringify';
 import { isPlainObject } from 'lodash-es';
+import { JSONPath } from 'jsonpath-plus';
 import { VectorStore, BruteForceVectorStore } from './vector-store.js';
 import { CognitiveItem, newCognitiveItemId, SemanticAtom, SemanticAtomMetadata, TruthValue, UUID } from './types.js';
 import { createSemanticAtomId } from './utils.js';
@@ -250,17 +251,15 @@ export class WorldModelImpl extends EventEmitter implements WorldModel {
     const matchingAtomIds = new Set<UUID>();
 
     for (const [atomId, content] of this.structuralIndex.entries()) {
-      // TEMPORARY WORKAROUND: The jsonpath library is causing issues in the test environment.
-      // This is a temporary, hard-coded filter that should be replaced with a robust
-      // JSONPath implementation once the environment issues are resolved.
-      if (pattern === "$.[?(@.type=='file')]") {
-        if (content && typeof content === 'object' && 'type' in content && content.type === 'file') {
+      try {
+        const result = JSONPath({ path: pattern, json: [content], resultType: 'value' });
+        // JSONPath returns the matched values. If it finds anything, the array will not be empty.
+        if (result && result.length > 0) {
           matchingAtomIds.add(atomId);
         }
-      } else {
-        // The original implementation would go here.
-        // For now, we do nothing for other patterns, and we'll log a warning.
-        console.warn(`query_by_structure is using a temporary workaround and does not support the pattern: ${pattern}`);
+      } catch (e) {
+        // Suppress errors from invalid JSONPath expressions
+        // console.error(`Error applying JSONPath expression "${pattern}":`, e);
       }
     }
 

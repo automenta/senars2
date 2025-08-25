@@ -1,0 +1,87 @@
+import { test, expect, jest } from '@jest/globals';
+import { Executor } from './action.js';
+import { CognitiveCore } from '../cognitive-core.js';
+import { WorldModel, WorldModelImpl } from '../world-model.js';
+import { AgendaImpl } from '../agenda.js';
+import { CognitiveItem, newCognitiveItemId } from '../types.js';
+
+// A mock executor for testing purposes
+class EchoExecutor implements Executor {
+    constructor(private worldModel: WorldModel) {}
+
+    can_execute(goal: CognitiveItem): boolean {
+      return goal.label === 'local-stdio_echo';
+    }
+
+    async execute(goal: CognitiveItem): Promise<CognitiveItem | null> {
+      const goalAtom = this.worldModel.get_atom(goal.atom_id);
+      if (!goalAtom) return null;
+
+      const toolInput = goalAtom.content;
+      const resultAtom = this.worldModel.find_or_create_atom(
+        { result: toolInput.message },
+        { type: 'Fact', source: 'local-stdio_echo' }
+      );
+
+      const resultBelief: CognitiveItem = {
+        id: newCognitiveItemId(),
+        atom_id: resultAtom.id,
+        type: 'BELIEF',
+        label: `Result from local-stdio_echo`,
+        attention: { priority: 0.8, durability: 0.8 },
+        truth: { frequency: 1.0, confidence: 1.0 },
+        stamp: {
+          timestamp: Date.now(),
+          parent_ids: [goal.id],
+          schema_id: 'echo-tool-schema' as any,
+        },
+        goal_parent_id: goal.id,
+      };
+      return resultBelief;
+    }
+}
+
+test('ActionSubsystem and CognitiveCore Integration', async () => {
+    jest.setTimeout(5000);
+
+    // Setup
+    const agenda = new AgendaImpl();
+    const realWorldModel = new WorldModelImpl();
+    const cognitiveCore = new CognitiveCore(agenda, realWorldModel);
+    const worldModel = cognitiveCore.getModules().worldModel;
+    const actionSubsystem = cognitiveCore.getModules().action;
+    actionSubsystem.registerExecutor(new EchoExecutor(worldModel));
+    await cognitiveCore.initialize();
+
+    // 1. Create a goal
+    const toolInput = { message: 'Hello MCP!' };
+    const goalAtom = worldModel.find_or_create_atom(toolInput, { type: 'Fact' });
+    const goalItem: CognitiveItem = {
+      id: newCognitiveItemId(),
+      atom_id: goalAtom.id,
+      type: 'GOAL',
+      label: 'local-stdio_echo',
+      attention: { priority: 1.0, durability: 1.0 },
+      stamp: {
+        timestamp: Date.now(),
+        parent_ids: [],
+        schema_id: 'user-input' as any,
+      },
+    };
+
+    // 2. Run
+    agenda.push(goalItem);
+    cognitiveCore.start();
+    const resultItem = await agenda.pop();
+
+    // 3. Assert
+    expect(resultItem.type).toBe('BELIEF');
+    expect(resultItem.label).toBe('Result from local-stdio_echo');
+    expect(resultItem.goal_parent_id).toBe(goalItem.id);
+    const resultAtom = worldModel.get_atom(resultItem.atom_id);
+    expect(resultAtom).not.toBeNull();
+    expect(resultAtom?.content.result).toBe(toolInput.message);
+
+    // Teardown
+    await cognitiveCore.stop();
+  });
