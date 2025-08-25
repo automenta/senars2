@@ -7,7 +7,7 @@ import { GOAL_DECOMPOSITION_SCHEMA_ATOM } from '../utils';
 export interface GoalTreeManager {
   decompose(goal: CognitiveItem, worldModel: WorldModel, attentionModule: AttentionModule): CognitiveItem[];
 
-  mark_achieved(goal_id: UUID): void;
+  mark_achieved(goal_id: UUID): CognitiveItem[];
 
   mark_failed(goal_id: UUID): void;
 
@@ -22,6 +22,7 @@ export interface GoalTreeManager {
 
 export class GoalTreeManagerImpl implements GoalTreeManager {
   private goal_nodes: Map<UUID, { item: CognitiveItem, children: Set<UUID> }> = new Map();
+  private dependency_to_dependents_map: Map<UUID, Set<UUID>> = new Map();
   private worldModel: WorldModel;
   private attentionModule: AttentionModule;
 
@@ -37,17 +38,24 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
     // A simple, more generic decomposition strategy based on keywords.
     if (goalLabel.toLowerCase().startsWith('diagnose')) {
       const entity = goalLabel.substring('diagnose'.length).trim();
-      const subGoalLabels = [
-        `Gather information about ${entity}`,
-        `Analyze symptoms for ${entity}`,
-        `Formulate a conclusion for ${entity}`,
+
+      // Define the chain of goals
+      const goalSpecs = [
+        { label: `Gather information about ${entity}`, dependencies: [] },
+        { label: `Analyze symptoms for ${entity}`, dependencies: [0] }, // Depends on the first goal
+        { label: `Formulate a conclusion for ${entity}`, dependencies: [1] }, // Depends on the second goal
       ];
 
-      for (const label of subGoalLabels) {
+      const createdGoals: CognitiveItem[] = [];
+
+      for (const spec of goalSpecs) {
         const atom = worldModel.find_or_create_atom(
-          `(goal: "${label}")`,
+          `(goal: "${spec.label}")`,
           { type: 'Fact', source: 'system_schema_decomposition' }
         );
+
+        // Resolve dependencies based on the indices from the spec
+        const dependencyIds = spec.dependencies.map(index => createdGoals[index].id);
 
         const subGoal: CognitiveItem = {
           id: newCognitiveItemId(),
@@ -65,13 +73,16 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
             module: 'GoalTreeManager',
           },
           goal_parent_id: goal.id,
-          goal_status: 'active',
-          label: label,
+          goal_status: 'active', // Will be updated by add_goal
+          goal_dependencies: dependencyIds,
+          label: spec.label,
         };
+
+        this.add_goal(subGoal); // Register the new sub-goal, which will set its status
         subGoals.push(subGoal);
-        this.add_goal(subGoal); // Register the new sub-goal in the tree
+        createdGoals.push(subGoal);
       }
-      console.log(`Decomposed goal "${goalLabel}" into ${subGoals.length} sub-goals.`);
+      console.log(`Decomposed goal "${goalLabel}" into ${subGoals.length} dependent sub-goals.`);
     } else {
       console.log(`No generic decomposition strategy found for goal: "${goalLabel}"`);
     }
@@ -79,14 +90,20 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
     return subGoals;
   }
 
-  mark_achieved(goal_id: UUID): void {
+  mark_achieved(goal_id: UUID): CognitiveItem[] {
     const node = this.goal_nodes.get(goal_id);
-    if (node) {
-      node.item.goal_status = 'achieved';
-      console.log(`Goal ${node.item.label ?? goal_id} marked as ACHIEVED.`);
-      
-      // Propagate status to parent goals
-      this.checkAndPropagateStatus(goal_id);
+    if (!node) return [];
+
+    node.item.goal_status = 'achieved';
+    console.log(`Goal ${node.item.label ?? goal_id} marked as ACHIEVED.`);
+
+    // Propagate status to parent goals
+    this.checkAndPropagateStatus(goal_id);
+
+    // Check for dependent goals that can now be unblocked
+    return this.update_dependents(goal_id);
+
+      // TODO: Propagate failure to dependent goals
     }
   }
 
@@ -122,15 +139,42 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
   public add_goal(goal: CognitiveItem): void {
     if (goal.type !== 'GOAL') return;
 
+    // Check dependencies to determine initial status
+    let isBlocked = false;
+    if (goal.goal_dependencies && goal.goal_dependencies.length > 0) {
+      for (const depId of goal.goal_dependencies) {
+        const depNode = this.goal_nodes.get(depId);
+        if (depNode?.item.goal_status !== 'achieved') {
+          isBlocked = true;
+          break;
+        }
+      }
+    }
+
+    goal.goal_status = isBlocked ? 'blocked' : 'active';
+    console.log(`Adding goal '${goal.label}' with status: ${goal.goal_status}`);
+
+    // Add to main goal nodes map
     this.goal_nodes.set(goal.id, {
       item: goal,
       children: new Set(),
     });
 
+    // Add to parent's children set
     if (goal.goal_parent_id) {
       const parentNode = this.goal_nodes.get(goal.goal_parent_id);
       if (parentNode) {
         parentNode.children.add(goal.id);
+      }
+    }
+
+    // Populate the reverse dependency map
+    if (goal.goal_dependencies) {
+      for (const depId of goal.goal_dependencies) {
+        if (!this.dependency_to_dependents_map.has(depId)) {
+          this.dependency_to_dependents_map.set(depId, new Set());
+        }
+        this.dependency_to_dependents_map.get(depId)!.add(goal.id);
       }
     }
   }
@@ -142,6 +186,34 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
 
   public get_goal_tree(): Map<UUID, { item: CognitiveItem, children: Set<UUID> }> {
     return this.goal_nodes;
+  }
+
+  private update_dependents(achieved_goal_id: UUID): CognitiveItem[] {
+    const unblocked_goals: CognitiveItem[] = [];
+    const dependents = this.dependency_to_dependents_map.get(achieved_goal_id);
+
+    if (!dependents) return [];
+
+    for (const dependentId of dependents) {
+      const dependentNode = this.goal_nodes.get(dependentId);
+      if (dependentNode && dependentNode.item.goal_status === 'blocked') {
+        let all_deps_achieved = true;
+        for (const depId of dependentNode.item.goal_dependencies || []) {
+          const depNode = this.goal_nodes.get(depId);
+          if (depNode?.item.goal_status !== 'achieved') {
+            all_deps_achieved = false;
+            break;
+          }
+        }
+
+        if (all_deps_achieved) {
+          dependentNode.item.goal_status = 'active';
+          unblocked_goals.push(dependentNode.item);
+          console.log(`Goal ${dependentNode.item.label ?? dependentId} UNBLOCKED and set to active.`);
+        }
+      }
+    }
+    return unblocked_goals;
   }
 
   private checkAndPropagateStatus(goal_id: UUID): void {

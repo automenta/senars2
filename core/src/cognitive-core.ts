@@ -96,6 +96,12 @@ export class CognitiveCore {
       const item = await this.agenda.pop();
       console.log(`Processing item: ${item.label ?? item.id}`);
 
+      // Defensive check: If a blocked goal somehow ends up on the agenda, skip it.
+      if (item.type === 'GOAL' && item.goal_status === 'blocked') {
+        console.log(`Skipping blocked goal: ${item.label ?? item.id}`);
+        continue;
+      }
+
       try {
         // Step 1: Handle Goals
         if (item.type === 'GOAL') {
@@ -115,7 +121,8 @@ export class CognitiveCore {
         // Step 4: Update Attention and Goal Status
         this.modules.attention.update_on_access([item, ...contextItems], this.worldModel);
         if (item.type === 'GOAL' && await this.is_achieved(item)) {
-          this.modules.goalTree.mark_achieved(item.id);
+          const unblockedGoals = this.modules.goalTree.mark_achieved(item.id);
+          unblockedGoals.forEach(goal => this.agenda.push(goal));
         }
 
       } catch (e) {
@@ -141,7 +148,8 @@ export class CognitiveCore {
     const resultItem = await this.modules.action.executeGoal(item);
     if (resultItem) {
       this.agenda.push(resultItem);
-      this.modules.goalTree.mark_achieved(item.id);
+      const unblockedGoals = this.modules.goalTree.mark_achieved(item.id);
+      unblockedGoals.forEach(goal => this.agenda.push(goal));
       console.log(`Goal ${item.label ?? item.id} executed by ActionSubsystem.`);
       this.modules.attention.update_on_access([item], this.worldModel);
       return true;

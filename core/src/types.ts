@@ -86,10 +86,11 @@ export type CognitiveItem = {
   // Optional fields for goal management
   goal_parent_id?: UUID;
   goal_status?: 'active' | 'blocked' | 'achieved' | 'failed';
+  goal_dependencies?: UUID[]; // New field for dependencies
 
   // Optional, human-readable label
   label?: string;
 };
 
 // A partial item, usually created by a schema, before it is finalized with attention and a stamp by the cognitive core.
-export type PartialCognitiveItem = Pick<CognitiveItem, 'atom_id' | 'type' | 'truth' | 'goal_parent_id' | 'goal_status' | 'label'>;
+export type PartialCognitiveItem = Pick<CognitiveItem, 'atom_id' | 'type' | 'truth' | 'goal_parent_id' | 'goal_status' | 'goal_dependencies' | 'label'>;
