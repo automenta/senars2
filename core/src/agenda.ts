@@ -151,7 +151,7 @@ export class AgendaImpl implements Agenda {
 
   constructor() {
     // Order by attention.priority (descending), so higher priority items are popped first.
-    this.queue = new PriorityQueue<CognitiveItem>((a, b) => b.attention.priority - a.attention.priority);
+    this.queue = new PriorityQueue<CognitiveItem>((a, b) => a.attention.priority - b.attention.priority);
   }
 
   push(item: CognitiveItem): void {

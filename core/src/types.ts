@@ -91,5 +91,5 @@ export type CognitiveItem = {
   label?: string;
 };
 
-// A partial item used for calculations where a full item is not yet available.
-export type PartialCognitiveItem = Pick<CognitiveItem, 'type' | 'truth' | 'stamp'>;
+// A partial item, usually created by a schema, before it is finalized with attention and a stamp by the cognitive core.
+export type PartialCognitiveItem = Pick<CognitiveItem, 'atom_id' | 'type' | 'truth' | 'goal_parent_id' | 'goal_status' | 'label'>;

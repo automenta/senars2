@@ -42,10 +42,11 @@ export class DefaultBeliefRevisionEngine implements BeliefRevisionEngine {
   }
 }
 
-export type CognitiveSchema = {
-  atom_id: UUID;
-  apply: (a: CognitiveItem, b: CognitiveItem) => CognitiveItem[];
-};
+import { CognitiveItem, SemanticAtom, SemanticAtomMetadata, TruthValue, UUID } from './types';
+import { createSemanticAtomId } from './utils';
+
+// NOTE: CognitiveSchema type and its related logic have been moved to `modules/schema.ts`.
+// The WorldModel is now only responsible for storing the raw SemanticAtoms for schemas.
 
 export interface WorldModel {
   add_atom(atom: SemanticAtom): UUID;
@@ -61,7 +62,6 @@ export interface WorldModel {
   query_by_structure(pattern: any, k?: number): CognitiveItem[];
 
   revise_belief(new_item: CognitiveItem): CognitiveItem | null;
-  register_schema_atom(atom: SemanticAtom): CognitiveSchema | null;
   find_or_create_atom(content: any, meta: SemanticAtomMetadata): SemanticAtom;
 }
 
@@ -84,9 +84,6 @@ export class WorldModelImpl implements WorldModel {
 
   // Modules
   private beliefRevisionEngine: BeliefRevisionEngine;
-
-  // Schema Storage
-  private schemas: Map<UUID, CognitiveSchema> = new Map();
 
   constructor(embeddingDimension: number, revisionEngine?: BeliefRevisionEngine) {
     this.beliefRevisionEngine =
@@ -249,19 +246,18 @@ export class WorldModelImpl implements WorldModel {
     return results;
   }
 
-  query_by_structure(pattern: any, k?: number): CognitiveItem[] {
+  query_by_structure(pattern: string, k?: number): CognitiveItem[] {
     const matchingAtomIds = new Set<UUID>();
 
     for (const [atomId, content] of this.structuralIndex.entries()) {
       try {
-        // Wrap the content in an array to allow root-level filters like $[?(@.type=='animal')]
-        const result = JSONPath({ path: pattern, json: [content] });
+        const result = JSONPath({ path: pattern, json: content });
+        // JSONPath returns an array of matches. If it's not empty, the atom matches.
         if (result && result.length > 0) {
           matchingAtomIds.add(atomId);
         }
       } catch (e) {
-        // Ignore errors in JSONPath parsing for now
-        // console.error(`Error applying JSONPath pattern "${pattern}" to atom ${atomId}`, e);
+        console.error(`Error applying JSONPath pattern "${pattern}" to atom ${atomId}:`, e);
       }
     }
 
@@ -270,17 +266,14 @@ export class WorldModelImpl implements WorldModel {
       const itemIds = this.atomIdToItemIds.get(atomId);
       if (itemIds) {
         for (const itemId of itemIds) {
-          if (k && results.length >= k) {
-            break;
-          }
           const item = this.get_item(itemId);
           if (item) {
             results.push(item);
+            if (k && results.length >= k) {
+              return results; // Return early if we have enough items
+            }
           }
         }
-      }
-      if (k && results.length >= k) {
-        break;
       }
     }
 
@@ -335,64 +328,6 @@ export class WorldModelImpl implements WorldModel {
     }
 
     return updatedItem;
-  }
-
-  register_schema_atom(atom: SemanticAtom): CognitiveSchema | null {
-    if (atom.meta.type !== 'CognitiveSchema') {
-      console.error(
-        `Attempted to register atom ${atom.id} as a schema, but its type is ${atom.meta.type}`,
-      );
-      return null;
-    }
-
-    try {
-      const definition = atom.content;
-      if (!definition || !definition.if || !definition.then) {
-        throw new Error('Schema content must include "if" and "then" clauses.');
-      }
-
-      const compiledSchema: CognitiveSchema = {
-        atom_id: atom.id,
-        apply: (a: CognitiveItem, b: CognitiveItem): CognitiveItem[] => {
-          // Check if the types of the incoming items match the schema's 'if' condition
-          const isMatchA = a.type === definition.if.a?.type;
-          const isMatchB = b.type === definition.if.b?.type;
-
-          if (isMatchA && isMatchB) {
-            const thenClause = definition.then;
-            let label = thenClause.label_template || 'New Derived Item';
-            if (label.includes('{{a.label}}')) {
-              label = label.replace('{{a.label}}', a.label || '');
-            }
-            if (label.includes('{{b.label}}')) {
-              label = label.replace('{{b.label}}', b.label || '');
-            }
-
-            const newItem: CognitiveItem = {
-              id: newCognitiveItemId(),
-              atom_id: thenClause.atom_id_from === 'a' ? a.atom_id : b.atom_id,
-              type: thenClause.type || 'BELIEF',
-              label,
-              truth: thenClause.truth || { frequency: 1.0, confidence: 0.9 },
-              attention: thenClause.attention || { priority: 0.8, durability: 0.8 },
-              stamp: {
-                timestamp: Date.now(),
-                parent_ids: [a.id, b.id],
-                schema_id: atom.id,
-              },
-            };
-            return [newItem];
-          }
-          return [];
-        },
-      };
-
-      this.schemas.set(atom.id, compiledSchema);
-      return compiledSchema;
-    } catch (e: any) {
-      console.error(`Failed to compile schema ${atom.id}: ${e.message}`);
-      return null;
-    }
   }
 }
 

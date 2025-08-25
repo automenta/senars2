@@ -5,9 +5,10 @@ import WebSocket from 'ws';
 import { CognitiveCore } from './cognitive-core';
 import { AgendaImpl } from './agenda';
 import { WorldModelImpl } from './world-model';
-import { PerceptionModule } from './perception';
+import { PerceptionSubsystem } from './modules/perception';
 import { AttentionModuleImpl } from './modules/attention';
 import { CognitiveItem, UUID } from './types';
+import { RECIPE_SUGGESTION_SCHEMA_ATOM } from './utils';
 
 const app = express();
 const server = http.createServer(app);
@@ -29,7 +30,7 @@ function serializeGoalTree(goalTree: Map<UUID, { item: CognitiveItem; children: 
 const agenda = new AgendaImpl();
 const worldModel = new WorldModelImpl(768); // Assuming an embedding dimension of 768
 const attentionModule = new AttentionModuleImpl();
-const perception = new PerceptionModule(worldModel, attentionModule);
+const perception = new PerceptionSubsystem(worldModel, attentionModule);
 
 const cognitiveCore = new CognitiveCore(agenda, worldModel);
 
@@ -66,6 +67,18 @@ cognitiveCore.initialize().then(() => {
       factAtom.meta.trust_score = 0.95;
     }
     agenda.push(updatedFactBelief);
+  }
+
+  // Add cooking domain data
+  worldModel.add_atom(RECIPE_SUGGESTION_SCHEMA_ATOM);
+
+  const ingredient1 = perception.process(`BELIEF: (ingredient_available chicken)`);
+  if (ingredient1) {
+    agenda.push(ingredient1[0]);
+  }
+  const ingredient2 = perception.process(`BELIEF: (ingredient_available rice)`);
+  if (ingredient2) {
+    agenda.push(ingredient2[0]);
   }
   
   console.log('Initial items added to Agenda.');

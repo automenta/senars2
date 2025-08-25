@@ -90,3 +90,31 @@ export const GOAL_DECOMPOSITION_SCHEMA_ATOM: SemanticAtom = {
   embedding: [], // Will be filled by embedding service
   meta: GOAL_DECOMPOSITION_SCHEMA_META,
 };
+
+export const RECIPE_SUGGESTION_SCHEMA_CONTENT = {
+  if: {
+    a: { "type": "BELIEF", "content_pattern": "(ingredient_available ?ing1)" },
+    b: { "type": "BELIEF", "content_pattern": "(ingredient_available ?ing2)" }
+  },
+  then: {
+    type: "GOAL",
+    content_template: "(find_recipe_with ?ing1 ?ing2)",
+    label_template: "Find recipe with ?ing1 and ?ing2"
+  }
+};
+
+export const RECIPE_SUGGESTION_SCHEMA_META: SemanticAtomMetadata = {
+  type: 'CognitiveSchema',
+  source: 'system',
+  author: 'system',
+  trust_score: 1.0,
+  domain: 'cooking',
+  license: 'MIT',
+};
+
+export const RECIPE_SUGGESTION_SCHEMA_ATOM: SemanticAtom = {
+  id: createSemanticAtomId(RECIPE_SUGGESTION_SCHEMA_CONTENT, RECIPE_SUGGESTION_SCHEMA_META),
+  content: RECIPE_SUGGESTION_SCHEMA_CONTENT,
+  embedding: [], // Will be filled by embedding service
+  meta: RECIPE_SUGGESTION_SCHEMA_META,
+};

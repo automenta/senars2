@@ -53,12 +53,19 @@ export class CognitiveCore {
 
   public async initialize(): Promise<void> {
     console.log('Initializing CognitiveCore modules...');
+
     // Register system schemas
     this.worldModel.add_atom(GOAL_DECOMPOSITION_SCHEMA_ATOM);
-    this.worldModel.register_schema_atom(GOAL_DECOMPOSITION_SCHEMA_ATOM);
+
+    // Find all schema atoms and register them with the matcher
+    const allAtoms = this.worldModel.get_all_atoms();
+    for (const atom of allAtoms) {
+      if (atom.meta.type === 'CognitiveSchema') {
+        this.modules.matcher.register_schema(atom);
+      }
+    }
 
     await this.modules.action.initialize();
-    // Initialize reflection module
     this.modules.reflection.start();
     console.log('CognitiveCore modules initialized.');
   }
@@ -147,74 +154,40 @@ export class CognitiveCore {
   }
 
   /**
-   * Finds and applies relevant schemas to a pair of cognitive items.
+   * Finds and applies relevant schemas to an item and its context.
    */
   private async applySchemas(itemA: CognitiveItem, contextItems: CognitiveItem[]): Promise<void> {
-    for (const itemB of contextItems) {
-      const schemas = this.modules.matcher.find_applicable(itemA, itemB, this.worldModel);
-      for (const schema of schemas) {
-        try {
-          const derivedItems = await this.createDerivedItems(schema, itemA, itemB);
-          for (const newItem of derivedItems) {
-            this.agenda.push(newItem);
-            console.log(`Pushed derived item to agenda: ${newItem.label ?? newItem.id}`);
-            if (newItem.type === 'BELIEF' && newItem.goal_parent_id) {
-              this.modules.goalTree.mark_achieved(newItem.goal_parent_id);
-            }
-          }
-        } catch (error) {
-          console.warn(`Schema ${schema.atom_id} failed to apply`, error);
-        }
-      }
-    }
-  }
+    const derivationResults = this.modules.matcher.find_and_apply_schemas(itemA, contextItems, this.worldModel);
 
-  /**
-   * Creates new cognitive items based on a schema and parent items.
-   */
-  private async createDerivedItems(schema: any, itemA: CognitiveItem, itemB: CognitiveItem): Promise<CognitiveItem[]> {
-    const schemaAtom = this.worldModel.get_atom(schema.atom_id);
-    const sourceTrust = schemaAtom?.meta.trust_score ?? 0.5;
+    for (const result of derivationResults) {
+      const { partialItem, parentItems, schema } = result;
 
-    const thenClause = schema.content.then;
-    let label = thenClause.label_template || 'New Derived Item';
-    label = label.replace('{{a.label}}', itemA.label || 'itemA').replace('{{b.label}}', itemB.label || 'itemB');
+      const schemaAtom = this.worldModel.get_atom(schema.atom_id);
+      const sourceTrust = schemaAtom?.meta.trust_score ?? 0.8;
 
-    let atom_id: UUID;
-    if (thenClause.atom_id_from === 'a') {
-      atom_id = itemA.atom_id;
-    } else if (thenClause.atom_id_from === 'b') {
-      atom_id = itemB.atom_id;
-    } else {
-      const content = thenClause.content_template || { derived_from: [itemA.atom_id, itemB.atom_id].filter(Boolean) };
-      const newAtom = this.worldModel.find_or_create_atom(content, {
-        type: 'Fact',
-        source: 'system_schema_derivation',
+      const attention = this.modules.attention.calculate_derived(
+        parentItems,
+        schema.atom_id,
+        sourceTrust
+      );
+
+      const stamp: DerivationStamp = {
+        timestamp: Date.now(),
+        parent_ids: parentItems.map(p => p.id),
         schema_id: schema.atom_id,
-      });
-      atom_id = newAtom.id;
+        module: 'SchemaMatcher',
+      };
+
+      const newItem: CognitiveItem = {
+        ...partialItem,
+        id: newCognitiveItemId(),
+        attention,
+        stamp,
+      };
+
+      this.agenda.push(newItem);
+      console.log(`Pushed derived item to agenda: ${newItem.label ?? newItem.id}`);
     }
-
-    const attention = this.modules.attention.calculate_derived([itemA, itemB], schema.atom_id, sourceTrust);
-    const stamp: DerivationStamp = {
-      timestamp: Date.now(),
-      parent_ids: [itemA.id, itemB.id],
-      schema_id: schema.atom_id,
-      module: 'SchemaMatcher',
-    };
-
-    const newItem: CognitiveItem = {
-      id: newCognitiveItemId(),
-      atom_id,
-      attention,
-      stamp,
-      type: thenClause.type,
-      truth: thenClause.truth || { frequency: 1.0, confidence: 0.7 },
-      goal_parent_id: itemA.type === 'GOAL' ? itemA.id : itemB.type === 'GOAL' ? itemB.id : undefined,
-      label,
-    };
-
-    return [newItem];
   }
 
   /**

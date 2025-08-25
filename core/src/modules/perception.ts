@@ -22,44 +22,53 @@ export class TextTransducer implements Transducer {
   }
 
   async process(data: string): Promise<CognitiveItem[]> {
-    // In a real scenario, an LLM would parse the text into structured facts, goals, or queries.
-    // For this example, we'll create a simple BELIEF item.
+    let itemType: CognitiveItem['type'] = 'BELIEF';
+    let itemContent = data;
+
+    if (data.startsWith('GOAL:')) {
+      itemType = 'GOAL';
+      itemContent = data.substring(6).trim();
+    } else if (data.startsWith('BELIEF:')) {
+      itemType = 'BELIEF';
+      itemContent = data.substring(8).trim();
+    } else if (data.startsWith('QUERY:')) {
+      itemType = 'QUERY';
+      itemContent = data.substring(7).trim();
+    }
 
     const meta: SemanticAtomMetadata = {
       type: 'Observation',
       source: 'user_input',
       timestamp: new Date().toISOString(),
-      trust_score: 0.6, // User input has a default trust score
+      trust_score: 0.6,
       domain: 'general',
     };
 
-    const atom = this.worldModel.find_or_create_atom(data, meta);
+    const atom = this.worldModel.find_or_create_atom(itemContent, meta);
 
-    const beliefItem: CognitiveItem = {
-      id: newCognitiveItemId(),
-      atom_id: atom.id,
-      type: 'BELIEF',
-      truth: { frequency: 1.0, confidence: 0.6 },
-      attention: this.attentionModule.calculate_initial({
-        type: 'BELIEF',
-        truth: { frequency: 1.0, confidence: 0.6 },
-        stamp: {
-          timestamp: Date.now(),
-          parent_ids: [],
-          schema_id: 'initial-observation-schema' as UUID,
-          module: 'PerceptionSubsystem',
-        },
-      }),
+    const partialItem = {
+      type: itemType,
+      truth: itemType === 'BELIEF' ? { frequency: 1.0, confidence: 0.6 } : undefined,
       stamp: {
         timestamp: Date.now(),
         parent_ids: [],
-        schema_id: 'initial-observation-schema' as UUID, // Placeholder schema ID
-        module: 'PerceptionSubsystem',
+        schema_id: 'user-input-schema' as UUID,
+        module: 'Perception',
       },
-      label: data.substring(0, 50) + (data.length > 50 ? '...' : ''),
     };
 
-    return [beliefItem];
+    const newItem: CognitiveItem = {
+      id: newCognitiveItemId(),
+      atom_id: atom.id,
+      type: itemType,
+      truth: itemType === 'BELIEF' ? { frequency: 1.0, confidence: 0.6 } : undefined,
+      attention: this.attentionModule.calculate_initial(partialItem),
+      stamp: partialItem.stamp,
+      label: itemContent.substring(0, 70) + (itemContent.length > 70 ? '...' : ''),
+      goal_status: itemType === 'GOAL' ? 'active' : undefined,
+    };
+
+    return [newItem];
   }
 }
 

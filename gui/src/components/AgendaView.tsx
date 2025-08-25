@@ -8,9 +8,38 @@ function AgendaView() {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [goalType, setGoalType] = useState('Diagnose condition');
   const [contextText, setContextText] = useState('');
+  const [filterPriority, setFilterPriority] = useState('all');
+  const [filterDomain, setFilterDomain] = useState('all');
+  const [filterTrust, setFilterTrust] = useState(0);
   const [detectedEntities, setDetectedEntities] = useState<string[]>([]);
   const [suggestedGoal, setSuggestedGoal] = useState('');
+  const [priority, setPriority] = useState(0.5);
+  const [factors, setFactors] = useState<string[]>([]);
   const [worldModel, setWorldModel] = useState<SemanticAtom[]>([]);
+
+  const filteredAgendaItems = React.useMemo(() => {
+    return agendaItems.filter(item => {
+      // Priority filter
+      if (filterPriority !== 'all') {
+        if (filterPriority === 'high' && item.attention.priority < 0.7) return false;
+        if (filterPriority === 'low' && item.attention.priority >= 0.3) return false;
+      }
+
+      // Trust filter
+      const atom = worldModel.find(a => a.id === item.atom_id);
+      const trustScore = atom?.meta.trust_score ?? item.truth?.confidence ?? 0.5;
+      if (trustScore < filterTrust) {
+        return false;
+      }
+
+      // Domain filter
+      if (filterDomain !== 'all') {
+        if (!atom?.meta.domain || atom.meta.domain !== filterDomain) return false;
+      }
+
+      return true;
+    });
+  }, [agendaItems, filterPriority, filterDomain, filterTrust, worldModel]);
 
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:3001');
@@ -69,32 +98,36 @@ function AgendaView() {
     }
   };
 
-  const handleContextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setContextText(value);
-
-    // Simple entity detection
-    const entities: string[] = [];
-    const keywords = ['cat', 'dog', 'sick', 'chocolate', 'eat', 'verify', 'assess'];
-    keywords.forEach(k => {
-        if (value.toLowerCase().includes(k) && !entities.includes(k)) {
-            entities.push(k);
-        }
-    });
-    setDetectedEntities(entities);
-
-    // Simple goal suggestion
-    if (entities.includes('cat') && entities.includes('chocolate')) {
-      setSuggestedGoal('Diagnose chocolate toxicity in cats');
-    } else if (entities.includes('dog') && entities.includes('chocolate')) {
-      setSuggestedGoal('Diagnose chocolate toxicity in dogs');
-    } else if (entities.length > 0) {
-      setSuggestedGoal(`Assess situation with: ${entities.join(', ')}`);
-    }
-    else {
+  useEffect(() => {
+    if (!contextText.trim()) {
       setSuggestedGoal('');
+      setDetectedEntities([]);
+      setPriority(0.5);
+      setFactors([]);
+      return;
     }
-  };
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch('http://localhost:3001/api/compose-goal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: contextText }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setSuggestedGoal(data.suggestedGoal);
+          setDetectedEntities(data.detectedEntities);
+          setPriority(data.priority);
+          setFactors(data.factors);
+        }
+      } catch (error) {
+        console.error('Error composing goal:', error);
+      }
+    }, 500); // Debounce API call
+
+    return () => clearTimeout(timer);
+  }, [contextText]);
 
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expandedItems);
@@ -233,7 +266,7 @@ function AgendaView() {
           <textarea
             id="context-input"
             value={contextText}
-            onChange={handleContextChange}
+            onChange={(e) => setContextText(e.target.value)}
             placeholder="e.g., My cat seems sick after eating chocolate"
             rows={3}
           />
@@ -253,7 +286,7 @@ function AgendaView() {
                     type="text"
                     value={suggestedGoal}
                     onChange={(e) => setSuggestedGoal(e.target.value)}
-                    placeholder="Diagnose chocolate toxicity in cats"
+                    placeholder="Type context to generate a goal..."
                 />
             </div>
         </div>
@@ -261,8 +294,8 @@ function AgendaView() {
         <div className="form-row">
             <label>Priority:</label>
             <div className="priority-display">
-                Automatically calculated: <span className="priority-value">[0.95]</span>
-                <span className="priority-factors">(Factors: Medical urgency, User symptoms, etc.)</span>
+                Automatically calculated: <span className="priority-value">[{priority.toFixed(2)}]</span>
+                <span className="priority-factors">({factors.length > 0 ? factors.join(', ') : 'Base priority'})</span>
             </div>
         </div>
 
@@ -285,27 +318,30 @@ function AgendaView() {
       <div className="toolbar">
         <button className="primary-button">[+] New Goal</button>
         <div className="filters">
-          <select>
-            <option>Priority: High ▼</option>
-            <option>Priority: Low ▲</option>
+          <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
+            <option value="all">All Priorities</option>
+            <option value="high">Priority: High</option>
+            <option value="low">Priority: Low</option>
           </select>
-          <select>
-            <option>All Domains</option>
-            <option>Pet Health</option>
+          <select value={filterDomain} onChange={e => setFilterDomain(e.target.value)}>
+            <option value="all">All Domains</option>
+            <option value="pet_health">Pet Health</option>
+            <option value="general">General</option>
           </select>
-          <select>
-            <option>Trust: All</option>
-            <option>Trust: 0.7+</option>
+          <select value={filterTrust} onChange={e => setFilterTrust(Number(e.target.value))}>
+            <option value={0}>Trust: All</option>
+            <option value={0.7}>Trust: 0.7+</option>
+            <option value={0.9}>Trust: 0.9+</option>
           </select>
         </div>
-        <div className="stats">🎯 {agendaItems.filter(item => item.type === 'GOAL').length}</div>
+        <div className="stats">🎯 {filteredAgendaItems.filter(item => item.type === 'GOAL').length}</div>
       </div>
 
       <div className="agenda-list">
-        {agendaItems.filter(item => !item.goal_parent_id).length === 0 ? (
-          <p>No active agenda items.</p>
+        {filteredAgendaItems.filter(item => !item.goal_parent_id).length === 0 ? (
+          <p>No matching agenda items. Try adjusting your filters.</p>
         ) : (
-          agendaItems.filter(item => !item.goal_parent_id).map((item) => {
+          filteredAgendaItems.filter(item => !item.goal_parent_id).map((item) => {
             const isExpanded = expandedItems.has(item.id);
             const children = goalTree[item.id]?.children || [];
             const atom = worldModel.find(a => a.id === item.atom_id);

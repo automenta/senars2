@@ -1,6 +1,5 @@
-import { CognitiveItem, CognitiveItemType, DerivationStamp, newCognitiveItemId, SemanticAtom, UUID } from '../types';
+import { CognitiveItem, CognitiveItemType, PartialCognitiveItem, SemanticAtom, UUID } from '../types';
 import { WorldModel } from '../world-model';
-import stableStringify from 'json-stable-stringify';
 
 export type CognitiveSchemaContent = {
   if: {
@@ -23,168 +22,114 @@ export type CognitiveSchema = {
   content: CognitiveSchemaContent;
 };
 
-export interface SchemaMatcher {
-  register_schema(schemaAtom: SemanticAtom): CognitiveSchema | null;
+export type DerivationResult = {
+  partialItem: PartialCognitiveItem;
+  parentItems: [CognitiveItem, CognitiveItem];
+  schema: CognitiveSchema;
+};
 
-  find_applicable(a: CognitiveItem, b: CognitiveItem, worldModel: WorldModel): CognitiveSchema[];
-  
+export interface SchemaMatcher {
+  register_schema(schemaAtom: SemanticAtom): void;
   find_and_apply_schemas(
     itemA: CognitiveItem,
     contextItems: CognitiveItem[],
     worldModel: WorldModel,
-  ): Array<Omit<CognitiveItem, 'id' | 'attention'>>;
+  ): DerivationResult[];
 }
 
 export class SchemaMatcherImpl implements SchemaMatcher {
   private schemas: Map<UUID, CognitiveSchema> = new Map();
 
-  constructor(worldModel: WorldModel) {
-    // Register any pre-existing schemas from the world model during initialization
-    worldModel.get_all_atoms().forEach(atom => {
-      if (atom.meta.type === 'CognitiveSchema') {
-        this.register_schema(atom);
-      }
-    });
-  }
-
-  register_schema(schemaAtom: SemanticAtom): CognitiveSchema | null {
-    if (schemaAtom.meta.type !== 'CognitiveSchema') {
-      console.warn(`Atom ${schemaAtom.id} is not of type CognitiveSchema. Cannot register.`);
-      return null;
-    }
-
+  public register_schema(schemaAtom: SemanticAtom): void {
+    if (schemaAtom.meta.type !== 'CognitiveSchema') return;
     const schemaContent: CognitiveSchemaContent = schemaAtom.content;
-
-    if (!schemaContent || !schemaContent.if || !schemaContent.then) {
-      console.error(`Invalid schema content for atom ${schemaAtom.id}. Missing 'if' or 'then' clause.`);
-      return null;
-    }
-
-    const cognitiveSchema: CognitiveSchema = {
-      atom_id: schemaAtom.id,
-      content: schemaContent,
-    };
-    this.schemas.set(schemaAtom.id, cognitiveSchema);
-    return cognitiveSchema;
+    if (!schemaContent?.if || !schemaContent?.then) return;
+    this.schemas.set(schemaAtom.id, { atom_id: schemaAtom.id, content: schemaContent });
   }
 
-  find_applicable(a: CognitiveItem, b: CognitiveItem, worldModel: WorldModel): CognitiveSchema[] {
-    const applicable: CognitiveSchema[] = [];
-    
-    for (const schema of this.schemas.values()) {
-      if (this.matches(a, schema.content.if.a) && this.matches(b, schema.content.if.b)) {
-        applicable.push(schema);
-      }
-    }
-    
-    return applicable;
-  }
-
-  find_and_apply_schemas(
+  public find_and_apply_schemas(
     itemA: CognitiveItem,
     contextItems: CognitiveItem[],
     worldModel: WorldModel,
-  ): Array<Omit<CognitiveItem, 'id' | 'attention'>> {
-    const derivedItems: Array<Omit<CognitiveItem, 'id' | 'attention'>> = [];
-
+  ): DerivationResult[] {
+    const results: DerivationResult[] = [];
     for (const schema of this.schemas.values()) {
-      // Check if schema applies to itemA alone (if schema.if.b is null)
-      if (!schema.content.if.b) {
-        if (this.matches(itemA, schema.content.if.a)) {
-          const newDerived = this.apply_schema(itemA, null, schema, worldModel);
-          if (newDerived) {
-            derivedItems.push(newDerived);
-          }
-        }
-      }
-
-      // Check if schema applies to itemA and any contextItem
       for (const itemB of contextItems) {
-        if (this.matches(itemA, schema.content.if.a) && this.matches(itemB, schema.content.if.b)) {
-          const newDerived = this.apply_schema(itemA, itemB, schema, worldModel);
-          if (newDerived) {
-            derivedItems.push(newDerived);
-          }
+        const bindings = this.getBindings(itemA, itemB, schema, worldModel);
+        if (bindings) {
+          results.push({
+            partialItem: this.apply_schema(schema, bindings, worldModel),
+            parentItems: [itemA, itemB],
+            schema,
+          });
         }
       }
     }
-    return derivedItems;
+    return results;
   }
 
-  private matches(item: CognitiveItem | null, condition?: CognitiveSchemaContent['if']['a']): boolean {
-    if (!condition) return true; // No condition means it matches
-    if (!item) return false; // Condition exists but item is null
+  private getBindings(a: CognitiveItem, b: CognitiveItem, schema: CognitiveSchema, worldModel: WorldModel): Record<string, any> | null {
+    const atomA = worldModel.get_atom(a.atom_id);
+    const atomB = worldModel.get_atom(b.atom_id);
+    if (!atomA || !atomB) return null;
 
-    if (condition.type && item.type !== condition.type) {
-      return false;
-    }
-    
-    if (condition.label_pattern && !(item.label && new RegExp(condition.label_pattern).test(item.label))) {
-      return false;
-    }
-    
-    // Implement content_pattern matching for SemanticAtom content
-    if (condition.content_pattern && item.atom_id) {
-      // This is a simplified implementation. A full implementation would need
-      // to match patterns against the actual content of the atom.
-      // For now, we'll just do a basic string matching
-      return true;
-    }
-    
-    return true;
+    const patternA = schema.content.if.a;
+    const patternB = schema.content.if.b;
+    if (!patternA || !patternB) return null; // Only supports 2-item schemas for now
+
+    if (patternA.type && a.type !== patternA.type) return null;
+    if (patternB.type && b.type !== patternB.type) return null;
+
+    const bindingsA = patternA.content_pattern ? this.matchPattern(patternA.content_pattern, atomA.content) : {};
+    if (!bindingsA) return null;
+
+    const bindingsB = patternB.content_pattern ? this.matchPattern(patternB.content_pattern, atomB.content, bindingsA) : {};
+    if (!bindingsB) return null;
+
+    return { ...bindingsA, ...bindingsB };
   }
 
-  private apply_schema(
-    itemA: CognitiveItem,
-    itemB: CognitiveItem | null,
-    schema: CognitiveSchema,
-    worldModel: WorldModel,
-  ): Omit<CognitiveItem, 'id' | 'attention'> | null {
+  private apply_schema(schema: CognitiveSchema, bindings: Record<string, any>, worldModel: WorldModel): PartialCognitiveItem {
     const thenClause = schema.content.then;
-
-    let label = thenClause.label_template || 'New Derived Item';
-    if (itemA.label) {
-      label = label.replace('{{a.label}}', itemA.label);
-    }
-    if (itemB && itemB.label) {
-      label = label.replace('{{b.label}}', itemB.label);
-    }
-
-    let atom_id: UUID;
-    let content: any = {};
-
-    if (thenClause.atom_id_from === 'a') {
-      atom_id = itemA.atom_id;
-      content = worldModel.get_atom(itemA.atom_id)?.content || {};
-    } else if (thenClause.atom_id_from === 'b' && itemB) {
-      atom_id = itemB.atom_id;
-      content = worldModel.get_atom(itemB.atom_id)?.content || {};
-    } else {
-      // Create a new atom based on content_template or a generic one
-      content = thenClause.content_template || { derived_from: [itemA.atom_id, itemB?.atom_id].filter(Boolean) };
-      const newAtom = worldModel.find_or_create_atom(content, {
-        type: 'Fact', // Derived atoms are typically facts, regardless of CognitiveItem type
-        source: 'system_schema_derivation',
-        schema_id: schema.atom_id,
-      });
-      atom_id = newAtom.id;
-    }
-
-    const parent_ids = [itemA.id];
-    if (itemB) parent_ids.push(itemB.id);
-
+    const newContent = this.applyTemplate(thenClause.content_template, bindings);
+    const newAtom = worldModel.find_or_create_atom(newContent, {
+      type: 'Fact',
+      source: `schema:${schema.atom_id}`,
+      trust_score: 0.8,
+    });
     return {
-      atom_id: atom_id,
+      atom_id: newAtom.id,
       type: thenClause.type,
-      truth: thenClause.truth || { frequency: 1.0, confidence: 0.7 },
-      goal_parent_id: itemA.type === 'GOAL' ? itemA.id : itemB?.type === 'GOAL' ? itemB.id : undefined,
-      label,
-      stamp: {
-        timestamp: Date.now(),
-        parent_ids: parent_ids,
-        schema_id: schema.atom_id,
-        module: 'SchemaMatcher',
-      },
+      label: this.applyTemplate(thenClause.label_template || '', bindings),
+      truth: thenClause.truth || { frequency: 1.0, confidence: 0.8 },
     };
+  }
+
+  private matchPattern(pattern: string, value: any, initialBindings: Record<string, any> = {}): Record<string, any> | null {
+    if (typeof value !== 'string' || typeof pattern !== 'string') return null;
+    const patternTokens = pattern.split(/\s+/);
+    const valueTokens = value.split(/\s+/);
+    if (patternTokens.length !== valueTokens.length) return null;
+    const bindings = { ...initialBindings };
+    for (let i = 0; i < patternTokens.length; i++) {
+      const pToken = patternTokens[i];
+      const vToken = valueTokens[i];
+      if (pToken.startsWith('?')) {
+        if (bindings[pToken] && bindings[pToken] !== vToken) return null;
+        bindings[pToken] = vToken;
+      } else if (pToken !== vToken) {
+        return null;
+      }
+    }
+    return bindings;
+  }
+
+  private applyTemplate(template: string, bindings: Record<string, any>): string {
+    if (!template) return '';
+    let result = template;
+    for (const key in bindings) {
+      result = result.replace(new RegExp(`\\${key}`, 'g'), bindings[key]);
+    }
+    return result;
   }
 }
