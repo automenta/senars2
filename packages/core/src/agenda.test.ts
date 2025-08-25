@@ -1,16 +1,16 @@
 import { AgendaImpl } from './agenda';
-import { CognitiveItem, newUUID, UUID } from './types';
+import { CognitiveItem, newCognitiveItemId, UUID } from './types';
 
 // Helper to create a dummy CognitiveItem
-const createItem = (priority: number, id: UUID = newUUID()): CognitiveItem => ({
+const createItem = (priority: number, id: UUID = newCognitiveItemId()): CognitiveItem => ({
     id,
-    atom_id: newUUID(),
+    atom_id: newCognitiveItemId(),
     type: 'GOAL',
     attention: { priority, durability: 0.5 },
     stamp: {
         timestamp: Date.now(),
         parent_ids: [],
-        schema_id: newUUID(),
+        schema_id: newCognitiveItemId(),
     },
     label: `p${priority}`,
 });
@@ -51,7 +51,7 @@ describe('AgendaImpl', () => {
         expect(poppedItem.id).toBe(item.id);
     });
 
-    it('should remove an item from the queue', () => {
+    it('should remove an item from the queue', async () => {
         const item1 = createItem(0.5);
         const item2 = createItem(0.9, 'removable' as UUID);
         const item3 = createItem(0.2);
@@ -63,7 +63,9 @@ describe('AgendaImpl', () => {
         const result = agenda.remove('removable' as UUID);
         expect(result).toBe(true);
         expect(agenda.size()).toBe(2);
-        expect(agenda.peek()?.id).toBe(item1.id);
+
+        const topItem = await agenda.pop();
+        expect(topItem.id).toBe(item1.id);
     });
 
     it('should return false when removing an item that does not exist', () => {
