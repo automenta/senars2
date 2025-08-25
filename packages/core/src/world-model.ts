@@ -50,7 +50,7 @@ export class DefaultBeliefRevisionEngine implements BeliefRevisionEngine {
 
 export type CognitiveSchema = {
   atom_id: UUID;
-  compiled: any;
+  apply: (a: CognitiveItem, b: CognitiveItem) => CognitiveItem[];
 };
 
 export interface WorldModel {
@@ -66,6 +66,9 @@ export interface WorldModel {
   query_by_semantic(embedding: number[], k: number): CognitiveItem[];
   query_by_symbolic(pattern: any, k?: number): CognitiveItem[];
   query_by_structure(pattern: string, k?: number): CognitiveItem[];
+
+  revise_belief(new_item: CognitiveItem): CognitiveItem | null;
+  register_schema_atom(atom: SemanticAtom): CognitiveSchema | null;
 }
 
 // --- WorldModel Implementation with Indexing ---
@@ -87,6 +90,9 @@ export class WorldModelImpl implements WorldModel {
 
   // Modules
   private beliefRevisionEngine: BeliefRevisionEngine;
+
+  // Schema Storage
+  private schemas: Map<UUID, CognitiveSchema> = new Map();
 
   constructor(embeddingDimension: number, revisionEngine?: BeliefRevisionEngine) {
     this.beliefRevisionEngine =
@@ -332,5 +338,63 @@ export class WorldModelImpl implements WorldModel {
     }
 
     return updatedItem;
+  }
+
+  register_schema_atom(atom: SemanticAtom): CognitiveSchema | null {
+    if (atom.meta.type !== 'CognitiveSchema') {
+      console.error(
+        `Attempted to register atom ${atom.id} as a schema, but its type is ${atom.meta.type}`
+      );
+      return null;
+    }
+
+    try {
+      const definition = atom.content;
+      if (!definition || !definition.if || !definition.then) {
+        throw new Error('Schema content must include "if" and "then" clauses.');
+      }
+
+      const compiledSchema: CognitiveSchema = {
+        atom_id: atom.id,
+        apply: (a: CognitiveItem, b: CognitiveItem): CognitiveItem[] => {
+          // Check if the types of the incoming items match the schema's 'if' condition
+          const isMatchA = a.type === definition.if.a?.type;
+          const isMatchB = b.type === definition.if.b?.type;
+
+          if (isMatchA && isMatchB) {
+            const thenClause = definition.then;
+            let label = thenClause.label_template || 'New Derived Item';
+            if (label.includes('{{a.label}}')) {
+              label = label.replace('{{a.label}}', a.label || '');
+            }
+            if (label.includes('{{b.label}}')) {
+              label = label.replace('{{b.label}}', b.label || '');
+            }
+
+            const newItem: CognitiveItem = {
+              id: newCognitiveItemId(),
+              atom_id: thenClause.atom_id_from === 'a' ? a.atom_id : b.atom_id,
+              type: thenClause.type || 'BELIEF',
+              label,
+              truth: thenClause.truth || { frequency: 1.0, confidence: 0.9 },
+              attention: thenClause.attention || { priority: 0.8, durability: 0.8 },
+              stamp: {
+                timestamp: Date.now(),
+                parent_ids: [a.id, b.id],
+                schema_id: atom.id,
+              },
+            };
+            return [newItem];
+          }
+          return [];
+        },
+      };
+
+      this.schemas.set(atom.id, compiledSchema);
+      return compiledSchema;
+    } catch (e: any) {
+      console.error(`Failed to compile schema ${atom.id}: ${e.message}`);
+      return null;
+    }
   }
 }
