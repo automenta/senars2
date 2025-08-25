@@ -1,5 +1,6 @@
 import { GoalTreeManagerImpl } from './goal-tree';
 import { WorldModel } from '../world-model';
+import { jest } from '@jest/globals';
 import { AttentionModule } from './attention';
 import { CognitiveItem, UUID, newCognitiveItemId } from '../types';
 

@@ -84,7 +84,7 @@ export const queryToGoalSchemaAtom: SemanticAtom = {
 
 describe('Pet Safety E2E Scenario', () => {
   it('should register all schemas without errors', () => {
-    const worldModel = new WorldModelImpl(1);
+    const worldModel = new WorldModelImpl();
     const schemaMatcher = new SchemaMatcherImpl(worldModel);
 
     expect(() => {

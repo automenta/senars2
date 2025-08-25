@@ -102,9 +102,6 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
 
     // Check for dependent goals that can now be unblocked
     return this.update_dependents(goal_id);
-
-      // TODO: Propagate failure to dependent goals
-    }
   }
 
   mark_failed(goal_id: UUID): void {

@@ -2,8 +2,6 @@ import { DefaultBeliefRevisionEngine, WorldModelImpl } from './world-model';
 import { CognitiveItem, newCognitiveItemId, SemanticAtom, TruthValue, UUID } from './types';
 import { createSemanticAtomId } from './utils';
 
-const EMBEDDING_DIM = 10;
-
 // Helper to create a dummy SemanticAtom
 const createAtom = (content: any, embedding: number[] = []): SemanticAtom => {
   const meta = { type: 'Fact' as const, source: 'test' };
@@ -38,7 +36,7 @@ describe('WorldModelImpl', () => {
   let worldModel: WorldModelImpl;
 
   beforeEach(() => {
-    worldModel = new WorldModelImpl(EMBEDDING_DIM);
+    worldModel = new WorldModelImpl();
   });
 
   it('should add and get atoms and items', () => {

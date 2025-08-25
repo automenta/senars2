@@ -8,7 +8,7 @@ describe('Integration Test', () => {
   it('should process a simple goal and belief', async () => {
     // Initialize core components
     const agenda = new AgendaImpl();
-    const worldModel = new WorldModelImpl(768);
+    const worldModel = new WorldModelImpl();
     const attentionModule = new AttentionModuleImpl();
     const perception = new PerceptionModule(worldModel, attentionModule);
     
