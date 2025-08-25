@@ -149,28 +149,6 @@ function AgendaView() {
     );
   };
 
-  const calculatePriority = (item: CognitiveItem) => {
-    // Example priority calculation based on factors from gui.md
-    let priority = item.attention.priority;
-    
-    // Medical urgency factor
-    if (item.label?.includes('diagnose') || item.label?.includes('illness')) {
-      priority += 0.3;
-    }
-    
-    // User-reported symptoms factor
-    if (item.label?.includes('user')) {
-      priority += 0.25;
-    }
-    
-    // High-trust reference data factor
-    if (item.truth?.confidence && item.truth.confidence > 0.8) {
-      priority += 0.2;
-    }
-    
-    return Math.min(1, priority).toFixed(2);
-  };
-
   const renderSubGoals = (parentId: string, currentGoalTree: GoalTree) => {
     const parentNode = currentGoalTree[parentId];
     if (!parentNode || !parentNode.children || parentNode.children.length === 0) {
@@ -258,13 +236,7 @@ function AgendaView() {
         {renderGoalSuggestions()}
         
         <div className="priority-info">
-          <p>Priority: Automatically calculated [{calculatePriority({} as CognitiveItem)}]</p>
-          <div className="priority-factors">
-            <span>Factors:</span>
-            <span className="factor">• Medical urgency (+0.30)</span>
-            <span className="factor">• User-reported symptoms (+0.25)</span>
-            <span className="factor">• High-trust reference data (+0.20)</span>
-          </div>
+          <p>Priority is calculated by the backend based on various factors.</p>
         </div>
         
         <div className="trust-requirements">
@@ -335,13 +307,9 @@ function AgendaView() {
                       
                       <div className="provenance-section">
                         <h4>Provenance</h4>
-                        <p>Source: {item.stamp.module || 'System'}</p>
-                        <p>Schema: "ChemicalComposition" (0.92) → (chocolate has theobromine)</p>
-                        <div className="provenance-details">
-                          <p>Confidence: 0.92 (weighted average)</p>
-                          <p>Source trust (0.95) × Schema reliability (0.92) = 0.874</p>
-                          <p>Usage: 12 reasoning paths including pet toxicity assessments</p>
-                        </div>
+                        <p>Source Module: {item.stamp.module || 'N/A'}</p>
+                        <p>Schema ID: {item.stamp.schema_id}</p>
+                        <p>Parent IDs: {item.stamp.parent_ids.join(', ')}</p>
                       </div>
                     </div>
                     

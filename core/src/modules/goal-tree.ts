@@ -30,139 +30,48 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
 
   decompose(goal: CognitiveItem, worldModel: WorldModel, attentionModule: AttentionModule): CognitiveItem[] {
     const subGoals: CognitiveItem[] = [];
+    const goalLabel = goal.label || '';
 
-    // More general decomposition logic
-    if (goal.label?.includes('Diagnose')) {
-      // Sub-goal 1: Verify chocolate toxicity
-      const verifyToxicityAtom = worldModel.find_or_create_atom(
-        '(verify chocolate toxicity)',
-        { type: 'Fact', source: 'system_schema' }
-      );
-      const verifyToxicityGoal: CognitiveItem = {
-        id: newCognitiveItemId(),
-        atom_id: verifyToxicityAtom.id,
-        type: 'GOAL',
-        attention: attentionModule.calculate_initial({
+    // A simple, more generic decomposition strategy based on keywords.
+    if (goalLabel.toLowerCase().startsWith('diagnose')) {
+      const entity = goalLabel.substring('diagnose'.length).trim();
+      const subGoalLabels = [
+        `Gather information about ${entity}`,
+        `Analyze symptoms for ${entity}`,
+        `Formulate a conclusion for ${entity}`,
+      ];
+
+      for (const label of subGoalLabels) {
+        const atom = worldModel.find_or_create_atom(
+          `(goal: "${label}")`,
+          { type: 'Fact', source: 'system_schema_decomposition' }
+        );
+
+        const subGoal: CognitiveItem = {
+          id: newCognitiveItemId(),
+          atom_id: atom.id,
           type: 'GOAL',
-          truth: undefined,
+          attention: attentionModule.calculate_derived(
+            [goal],
+            GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
+            0.9 // High trust for system decomposition schemas
+          ),
           stamp: {
             timestamp: Date.now(),
             parent_ids: [goal.id],
             schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
             module: 'GoalTreeManager',
           },
-        }),
-        stamp: {
-          timestamp: Date.now(),
-          parent_ids: [goal.id],
-          schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
-          module: 'GoalTreeManager',
-        },
-        goal_parent_id: goal.id,
-        goal_status: 'active',
-        label: 'Verify chocolate toxicity',
-      };
-      subGoals.push(verifyToxicityGoal);
-      this.add_goal(verifyToxicityGoal); // Add to the goal tree
-
-      // Sub-goal 2: Assess symptoms
-      const assessSymptomsAtom = worldModel.find_or_create_atom(
-        '(assess symptoms)',
-        { type: 'Fact', source: 'system_schema' }
-      );
-      const assessSymptomsGoal: CognitiveItem = {
-        id: newCognitiveItemId(),
-        atom_id: assessSymptomsAtom.id,
-        type: 'GOAL',
-        attention: attentionModule.calculate_initial({
-          type: 'GOAL',
-          truth: undefined,
-          stamp: {
-            timestamp: Date.now(),
-            parent_ids: [goal.id],
-            schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
-            module: 'GoalTreeManager',
-          },
-        }),
-        stamp: {
-          timestamp: Date.now(),
-          parent_ids: [goal.id],
-          schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
-          module: 'GoalTreeManager',
-        },
-        goal_parent_id: goal.id,
-        goal_status: 'active',
-        label: 'Assess symptoms',
-      };
-      subGoals.push(assessSymptomsGoal);
-      this.add_goal(assessSymptomsGoal); // Add to the goal tree
-
-      // Sub-goal 3: Recommend treatment
-      const recommendTreatmentAtom = worldModel.find_or_create_atom(
-        '(recommend treatment)',
-        { type: 'Fact', source: 'system_schema' }
-      );
-      const recommendTreatmentGoal: CognitiveItem = {
-        id: newCognitiveItemId(),
-        atom_id: recommendTreatmentAtom.id,
-        type: 'GOAL',
-        attention: attentionModule.calculate_initial({
-          type: 'GOAL',
-          truth: undefined,
-          stamp: {
-            timestamp: Date.now(),
-            parent_ids: [goal.id],
-            schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
-            module: 'GoalTreeManager',
-          },
-        }),
-        stamp: {
-          timestamp: Date.now(),
-          parent_ids: [goal.id],
-          schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
-          module: 'GoalTreeManager',
-        },
-        goal_parent_id: goal.id,
-        goal_status: 'active',
-        label: 'Recommend treatment',
-      };
-      subGoals.push(recommendTreatmentGoal);
-      this.add_goal(recommendTreatmentGoal); // Add to the goal tree
-
-      console.log(`Decomposed goal "${goal.label}" into ${subGoals.length} sub-goals.`);
-    } else if (goal.label?.includes('Verify')) {
-      // For verification goals, create a query
-      const queryAtom = worldModel.find_or_create_atom(
-        `(is_toxic_to chocolate cat)`,
-        { type: 'Fact', source: 'system_schema' }
-      );
-      const queryItem: CognitiveItem = {
-        id: newCognitiveItemId(),
-        atom_id: queryAtom.id,
-        type: 'QUERY',
-        attention: attentionModule.calculate_initial({
-          type: 'QUERY',
-          truth: undefined,
-          stamp: {
-            timestamp: Date.now(),
-            parent_ids: [goal.id],
-            schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
-            module: 'GoalTreeManager',
-          },
-        }),
-        stamp: {
-          timestamp: Date.now(),
-          parent_ids: [goal.id],
-          schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
-          module: 'GoalTreeManager',
-        },
-        goal_parent_id: goal.id,
-        label: 'Is chocolate toxic to cats?',
-      };
-      subGoals.push(queryItem);
-      console.log(`Decomposed verification goal "${goal.label}" into a query.`);
+          goal_parent_id: goal.id,
+          goal_status: 'active',
+          label: label,
+        };
+        subGoals.push(subGoal);
+        this.add_goal(subGoal); // Register the new sub-goal in the tree
+      }
+      console.log(`Decomposed goal "${goalLabel}" into ${subGoals.length} sub-goals.`);
     } else {
-      console.log(`Goal decomposition not implemented for goal: ${goal.label ?? goal.id}`);
+      console.log(`No generic decomposition strategy found for goal: "${goalLabel}"`);
     }
 
     return subGoals;

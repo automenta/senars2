@@ -93,28 +93,27 @@ export class CognitiveCore {
         // 1. Contextualize
         const contextItems = await this.modules.resonance.find_context(current_item, this.worldModel, 10);
 
-        // 2. Action
+        // 2. Goal Decomposition
         if (current_item.type === 'GOAL') {
-          const resultItem = await this.modules.action.executeGoal(current_item);
-          if (resultItem) {
-            this.agenda.push(resultItem);
-            this.modules.goalTree.mark_achieved(current_item.id);
-            console.log(`Goal ${current_item.label ?? current_item.id} executed by ActionSubsystem.`);
-            
-            // Reinforce after action execution
-            this.modules.attention.update_on_access([current_item], this.worldModel);
-            continue; // Move to the next item after executing a goal
+          // Always attempt to decompose a goal first.
+          const subGoals = this.modules.goalTree.decompose(current_item, this.worldModel, this.modules.attention);
+          if (subGoals.length > 0) {
+            subGoals.forEach(subGoal => this.agenda.push(subGoal));
+            console.log(`Goal ${current_item.label ?? current_item.id} decomposed into ${subGoals.length} sub-goals.`);
+            // After decomposition, we can skip the rest of the loop for this item.
+            continue;
           } else {
-            console.warn(`ActionSubsystem could not execute goal: ${current_item.label ?? current_item.id}. Attempting decomposition.`);
-            // If no tool found or execution failed, attempt to decompose the goal.
-            const subGoals = this.modules.goalTree.decompose(current_item, this.worldModel, this.modules.attention);
-            if (subGoals.length > 0) {
-              subGoals.forEach(subGoal => this.agenda.push(subGoal));
-              console.log(`Goal ${current_item.label ?? current_item.id} decomposed into ${subGoals.length} sub-goals.`);
-            } else {
-              console.warn(`Goal ${current_item.label ?? current_item.id} could not be decomposed. Tracking as a primary goal.`);
-              this.modules.goalTree.add_goal(current_item);
+             // If no decomposition, try to execute it as an action.
+            const resultItem = await this.modules.action.executeGoal(current_item);
+            if (resultItem) {
+              this.agenda.push(resultItem);
+              this.modules.goalTree.mark_achieved(current_item.id);
+              console.log(`Goal ${current_item.label ?? current_item.id} executed by ActionSubsystem.`);
+              this.modules.attention.update_on_access([current_item], this.worldModel);
+              continue;
             }
+            console.warn(`Goal ${current_item.label ?? current_item.id} could not be decomposed or executed. Tracking as a primary goal.`);
+            this.modules.goalTree.add_goal(current_item);
           }
         }
 

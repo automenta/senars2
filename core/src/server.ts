@@ -110,10 +110,18 @@ function broadcast(data: any) {
 
 // Periodically broadcast the state
 setInterval(() => {
+  const goalTree = serializeGoalTree(cognitiveCore.getModules().goalTree.get_goal_tree());
+
+  // --- DEBUGGING: Log the goal tree structure ---
+  if (Object.keys(goalTree).length > 0) {
+    console.log('Broadcasting Goal Tree Structure:', JSON.stringify(goalTree, null, 2));
+  }
+  // --- END DEBUGGING ---
+
   const state = {
     agenda: agenda.getItems(),
     worldModel: worldModel.get_all_atoms(),
-    goalTree: serializeGoalTree(cognitiveCore.getModules().goalTree.get_goal_tree()),
+    goalTree: goalTree,
   };
   broadcast(state);
 }, 1000);
