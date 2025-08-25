@@ -1,6 +1,6 @@
-import { AttentionValue, CognitiveItem, PartialCognitiveItem, UUID } from '../types';
-import { WorldModel } from '../world-model';
-import { Agenda } from '../agenda';
+import { AttentionValue, CognitiveItem, PartialCognitiveItem, UUID } from '../types.js';
+import { WorldModel } from '../world-model.js';
+import { Agenda } from '../agenda.js';
 
 export interface AttentionModule {
   calculate_initial(item: PartialCognitiveItem): AttentionValue;

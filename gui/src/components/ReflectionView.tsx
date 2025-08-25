@@ -1,45 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useReflectionData } from '../hooks/useReflectionData';
 
 function ReflectionView() {
-  const [activeTab, setActiveTab] = useState('paths');
-  const [healthScore, setHealthScore] = useState(92);
+  const { data, isLoading, error } = useReflectionData();
 
-  // Mock data for demonstration
-  const cognitiveHealth = {
-    activeGoals: 12,
-    optimalRange: "10-20",
-    memoryUtilization: "1.2M atoms",
-    compactionRecommended: true,
-    contradictionRate: 0.02,
-    safeThreshold: 0.05
-  };
+  if (isLoading) {
+    return <div>Loading Reflection Data...</div>;
+  }
 
-  const recommendedActions = [
-    {
-      type: "warning",
-      title: "Memory Optimization",
-      description: "Compact memory: 15% space savings (1.2M → 1.02M atoms)",
-      details: "Will deprecate 12 unused schemas",
-      actions: ["Schedule for tonight", "Run now", "Dismiss"]
-    },
-    {
-      type: "error",
-      title: "Trust Anomaly",
-      description: 'Source "petblog.com" shows 7 contradictions (confidence >0.7)',
-      details: "Recommended: Reduce trust from 0.45 → 0.30",
-      actions: ["Apply", "Investigate", "Maintain current"]
-    }
-  ];
+  if (error) {
+    return <div className="error">Error loading reflection data: {error}</div>;
+  }
 
-  const cognitiveInsights = [
-    'Schema "SpeciesToxicityTransfer" used in 87% of pet health diagnoses',
-    "Query resolution time average: 2.3m (target: <3m)",
-    "User confirmation increases belief confidence by average 0.18"
-  ];
+  if (!data) {
+    return <div>No reflection data available.</div>;
+  }
+
+  const { kpis, recommendations, insights } = data;
+
+  const healthScore = 100 - (kpis.memoryUtilization / 2) - (kpis.contradictionRate * 50);
 
   const renderHealthBar = () => {
     const segments = 100;
-    const filledSegments = healthScore;
+    const filledSegments = Math.round(healthScore);
     
     return (
       <div className="health-bar">
@@ -49,69 +32,31 @@ function ReflectionView() {
             className={`health-segment ${index < filledSegments ? 'filled' : ''}`}
           />
         ))}
-        <span className="health-text">...... {healthScore}%</span>
+        <span className="health-text">...... {filledSegments}%</span>
       </div>
     );
   };
 
   return (
     <div className="reflection-view">
-      <div className="reflection-header">
-        <div className="reflection-tabs">
-          <button 
-            className={activeTab === 'paths' ? 'active' : ''}
-            onClick={() => setActiveTab('paths')}
-          >
-            🔍 ACTIVE COGNITIVE PATHS
-          </button>
-          <button 
-            className={activeTab === 'memory' ? 'active' : ''}
-            onClick={() => setActiveTab('memory')}
-          >
-            Memory
-          </button>
-          <button 
-            className={activeTab === 'trust' ? 'active' : ''}
-            onClick={() => setActiveTab('trust')}
-          >
-            Trust
-          </button>
-          <button 
-            className={activeTab === 'system' ? 'active' : ''}
-            onClick={() => setActiveTab('system')}
-          >
-            System
-          </button>
-          <button 
-            className={activeTab === 'settings' ? 'active' : ''}
-            onClick={() => setActiveTab('settings')}
-          >
-            Settings
-          </button>
-        </div>
-      </div>
-
       <div className="reflection-content">
         <div className="health-section">
           <h3>COGNITIVE HEALTH: {renderHealthBar()}</h3>
           <div className="health-details">
-            <p>• Active goals: {cognitiveHealth.activeGoals} (optimal range: {cognitiveHealth.optimalRange})</p>
-            <p>• Memory utilization: {cognitiveHealth.memoryUtilization} {cognitiveHealth.compactionRecommended && "(compaction recommended)"}</p>
-            <p>• Contradiction rate: {cognitiveHealth.contradictionRate} (safe threshold: {cognitiveHealth.safeThreshold})</p>
+            <p>• Active goals: {kpis.activeGoals}</p>
+            <p>• Memory utilization: {kpis.memoryUtilization}%</p>
+            <p>• Contradiction rate: {kpis.contradictionRate}%</p>
           </div>
         </div>
 
         <div className="actions-section">
           <h3>RECOMMENDED ACTIONS</h3>
-          {recommendedActions.map((action, index) => (
-            <div key={index} className={`action-item ${action.type}`}>
-              <h4>{action.type === 'warning' ? '🟡' : '🔴'} {action.title}</h4>
+          {recommendations.map((action, index) => (
+            <div key={index} className={`action-item warning`}>
+              <h4>🟡 {action.title}</h4>
               <p>• {action.description}</p>
-              <p>• {action.details}</p>
               <div className="action-buttons">
-                {action.actions.map((btn, btnIndex) => (
-                  <button key={btnIndex} className="action-button">{btn}</button>
-                ))}
+                  <button className="action-button">{action.action}</button>
               </div>
             </div>
           ))}
@@ -119,7 +64,7 @@ function ReflectionView() {
 
         <div className="insights-section">
           <h3>COGNITIVE INSIGHTS</h3>
-          {cognitiveInsights.map((insight, index) => (
+          {insights.map((insight, index) => (
             <p key={index}>• {insight}</p>
           ))}
         </div>

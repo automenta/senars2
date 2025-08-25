@@ -1,14 +1,15 @@
-import { Agenda } from './agenda';
-import { WorldModel } from './world-model';
-import { AttentionModule, AttentionModuleImpl } from './modules/attention';
-import { ResonanceModule, ResonanceModuleImpl } from './modules/resonance';
-import { SchemaMatcher, SchemaMatcherImpl } from './modules/schema';
-import { GoalTreeManager, GoalTreeManagerImpl } from './modules/goal-tree';
-import { ActionSubsystem } from './modules/action';
-import { ReflectionModule, ReflectionModuleImpl } from './modules/reflection';
-import { PerceptionSubsystem } from './modules/perception';
-import { CognitiveItem, DerivationStamp, newCognitiveItemId, UUID } from './types';
-import { ALL_SYSTEM_SCHEMAS } from './system-schemas';
+import { Agenda } from './agenda.js';
+import { WorldModel, WorldModelImpl } from './world-model.js';
+import { AttentionModule, AttentionModuleImpl } from './modules/attention.js';
+import { ResonanceModule, ResonanceModuleImpl } from './modules/resonance.js';
+import { SchemaMatcher, SchemaMatcherImpl } from './modules/schema.js';
+import { GoalTreeManager, GoalTreeManagerImpl } from './modules/goal-tree.js';
+import { ActionSubsystem } from './modules/action.js';
+import { ReflectionModule, ReflectionModuleImpl } from './modules/reflection.js';
+import { PerceptionSubsystem } from './modules/perception.js';
+import { PredictiveModelingModule, PredictiveModelingModuleImpl } from './modules/predictive-modeling.js';
+import { CognitiveItem, DerivationStamp, newCognitiveItemId, UUID } from './types.js';
+import { ALL_SYSTEM_SCHEMAS } from './system-schemas.js';
 
 type CognitiveCoreModules = {
   attention: AttentionModule;
@@ -18,6 +19,7 @@ type CognitiveCoreModules = {
   action: ActionSubsystem;
   reflection: ReflectionModule;
   perception: PerceptionSubsystem;
+  prediction: PredictiveModelingModule;
 };
 
 export class CognitiveCore {
@@ -36,7 +38,8 @@ export class CognitiveCore {
     // Instantiate modules
     const attentionModule = new AttentionModuleImpl();
     const schemaMatcher = new SchemaMatcherImpl(worldModel);
-    const goalTreeManager = new GoalTreeManagerImpl(worldModel, attentionModule, schemaMatcher);
+    const predictionModule = new PredictiveModelingModuleImpl();
+    const goalTreeManager = new GoalTreeManagerImpl(worldModel, attentionModule, schemaMatcher, predictionModule);
     const actionSubsystem = new ActionSubsystem(worldModel); // Pass worldModel to ActionSubsystem
     const reflectionModule = new ReflectionModuleImpl(agenda, worldModel, attentionModule, 60000);
     const perceptionSubsystem = new PerceptionSubsystem(worldModel, attentionModule);
@@ -49,6 +52,7 @@ export class CognitiveCore {
       action: actionSubsystem,
       reflection: reflectionModule,
       perception: perceptionSubsystem,
+      prediction: predictionModule,
     };
   }
 

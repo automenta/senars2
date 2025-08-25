@@ -1,5 +1,5 @@
-import { AgendaImpl } from './agenda';
-import { CognitiveItem, newCognitiveItemId, UUID } from './types';
+import { AgendaImpl } from './agenda.js';
+import { CognitiveItem, newCognitiveItemId, UUID } from './types.js';
 
 // Helper to create a dummy CognitiveItem
 const createItem = (priority: number, id: UUID = newCognitiveItemId()): CognitiveItem => ({

@@ -1,6 +1,6 @@
-import { WorldModel } from './world-model';
-import { AttentionModule } from './modules/attention';
-import { CognitiveItem, CognitiveItemType, newCognitiveItemId, SemanticAtomMetadata } from './types';
+import { WorldModel } from './world-model.js';
+import { AttentionModule } from './modules/attention.js';
+import { CognitiveItem, CognitiveItemType, newCognitiveItemId, SemanticAtomMetadata } from './types.js';
 
 // --- S-Expression Parser ---
 

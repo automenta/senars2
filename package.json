@@ -5,7 +5,8 @@
   "description": "A verifiable, goal-directed reasoning system.",
   "main": "index.js",
   "scripts": {
-    "start-core": "ts-node core/src/main.ts"
+    "start-core": "ts-node core/src/main.ts",
+    "build:core": "node_modules/.bin/tsc -p core/tsconfig.json"
   },
   "keywords": [],
   "author": "",
@@ -21,7 +22,8 @@
     "prettier": "^3.6.2",
     "typescript": "^5.9.2",
     "jest": "^30.0.5",
-    "ts-jest": "^29.4.1"
+    "ts-jest": "^29.4.1",
+    "ts-node": "^10.9.2"
   },
   "dependencies": {
     "@types/lodash": "^4.17.20",

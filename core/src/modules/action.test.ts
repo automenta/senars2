@@ -1,13 +1,13 @@
-import { ActionSubsystem } from './action';
-import { CognitiveCore } from '../cognitive-core';
-import { AgendaImpl } from '../agenda';
-import { WorldModelImpl } from '../world-model';
-import { AttentionModuleImpl } from './attention';
-import { ResonanceModuleImpl } from './resonance';
-import { SchemaMatcherImpl } from './schema';
-import { GoalTreeManagerImpl } from './goal-tree';
-import { CognitiveItem, newCognitiveItemId } from '../types';
-import { ReflectionModuleImpl } from './reflection'; // Added import
+import { ActionSubsystem } from './action.js';
+import { CognitiveCore } from '../cognitive-core.js';
+import { AgendaImpl } from '../agenda.js';
+import { WorldModelImpl } from '../world-model.js';
+import { AttentionModuleImpl } from './attention.js';
+import { ResonanceModuleImpl } from './resonance.js';
+import { SchemaMatcherImpl } from './schema.js';
+import { GoalTreeManagerImpl } from './goal-tree.js';
+import { CognitiveItem, newCognitiveItemId } from '../types.js';
+import { ReflectionModuleImpl } from './reflection.js'; // Added import
 
 // Increase timeout for this test suite as it involves starting a subprocess
 jest.setTimeout(30000);
@@ -25,11 +25,11 @@ describe('ActionSubsystem and CognitiveCore Integration', () => {
   beforeEach(async () => {
     // Setup all the modules
     agenda = new AgendaImpl();
-    worldModel = new WorldModelImpl(1); // embedding dim doesn't matter here
+    worldModel = new WorldModelImpl(); // embedding dim doesn't matter here
     attentionModule = new AttentionModuleImpl(); // Assigned
     resonanceModule = new ResonanceModuleImpl(); // Assigned
     schemaMatcher = new SchemaMatcherImpl(worldModel); // Assigned
-    goalTreeManager = new GoalTreeManagerImpl(worldModel, attentionModule); // Assigned
+    goalTreeManager = new GoalTreeManagerImpl(worldModel, attentionModule, schemaMatcher); // Assigned
     actionSubsystem = new ActionSubsystem(worldModel);
 
     cognitiveCore = new CognitiveCore(agenda, worldModel);

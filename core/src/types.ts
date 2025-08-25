@@ -87,10 +87,12 @@ export type CognitiveItem = {
   goal_parent_id?: UUID;
   goal_status?: 'active' | 'blocked' | 'achieved' | 'failed';
   goal_dependencies?: UUID[]; // New field for dependencies
+  goal_estimated_completion_time?: number; // in milliseconds from now
+  goal_confidence_projection?: number; // a value between 0 and 1
 
   // Optional, human-readable label
   label?: string;
 };
 
-// A partial item, usually created by a schema, before it is finalized with attention and a stamp by the cognitive core.
-export type PartialCognitiveItem = Pick<CognitiveItem, 'atom_id' | 'type' | 'truth' | 'goal_parent_id' | 'goal_status' | 'goal_dependencies' | 'label'>;
+// A partial item, usually created by a schema, before it is finalized with attention and a full stamp by the cognitive core.
+export type PartialCognitiveItem = Pick<CognitiveItem, 'atom_id' | 'type' | 'truth' | 'goal_parent_id' | 'goal_status' | 'goal_dependencies' | 'label' | 'stamp' | 'goal_estimated_completion_time' | 'goal_confidence_projection'>;

@@ -1,18 +1,20 @@
-
 import express from 'express';
 import http from 'http';
-import WebSocket from 'ws';
-import { CognitiveCore } from './cognitive-core';
-import { AgendaImpl } from './agenda';
-import { WorldModelImpl } from './world-model';
-import { PerceptionSubsystem } from './modules/perception';
-import { AttentionModuleImpl } from './modules/attention';
-import { CognitiveItem, UUID } from './types';
-import { RECIPE_SUGGESTION_SCHEMA_ATOM } from './utils';
+import WebSocket, { WebSocketServer } from 'ws';
+import { CognitiveCore } from './cognitive-core.js';
+import { Agenda, AgendaImpl } from './agenda.js';
+import { WorldModel, WorldModelImpl } from './world-model.js';
+import { PerceptionSubsystem } from './modules/perception.js';
+import { AttentionModuleImpl } from './modules/attention.js';
+import { CognitiveItem, UUID } from './types.js';
+import { RECIPE_SUGGESTION_SCHEMA_ATOM } from './system-schemas.js';
+import { GoalCompositionModule } from './modules/goal-composition.js';
+import { GoalTreeManager } from './modules/goal-tree.js';
+import { SandboxService } from './sandbox-service.js';
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocketServer({ server });
 
 // Helper to convert Map to a JSON-serializable object
 function serializeGoalTree(goalTree: Map<UUID, { item: CognitiveItem; children: Set<UUID> }>) {
@@ -28,64 +30,44 @@ function serializeGoalTree(goalTree: Map<UUID, { item: CognitiveItem; children: 
 
 // Initialize core components
 const agenda = new AgendaImpl();
-const worldModel = new WorldModelImpl(768); // Assuming an embedding dimension of 768
+const worldModel = new WorldModelImpl();
 const attentionModule = new AttentionModuleImpl();
 const perception = new PerceptionSubsystem(worldModel, attentionModule);
 
 const cognitiveCore = new CognitiveCore(agenda, worldModel);
+const goalTreeManager = cognitiveCore.getModules().goalTree;
+const sandboxService = new SandboxService(worldModel, agenda);
 
-// Initialize the cognitive core
-cognitiveCore.initialize().then(() => {
-  cognitiveCore.start();
-  
-  // Add some initial items for demonstration
-  console.log('Adding initial items for demonstration...');
-  
-  // Example 1: User input leading to a goal
-  const userInput = "My cat seems sick after eating chocolate.";
-  const userInputAtom = worldModel.find_or_create_atom(userInput, {
-    type: 'Observation',
-    source: 'user_input',
-    trust_score: 0.6,
-  });
-
-  const initialGoal = perception.process(`GOAL: Diagnose cat illness`);
-  if (initialGoal) {
-    agenda.push(initialGoal);
-  }
-
-  // Example 2: A simple belief
-  const factBelief = perception.process(`BELIEF: (is_toxic_to chocolate dog)`);
-  if (factBelief) {
-    // Set higher trust for this belief
-    const updatedFactBelief = {
-      ...factBelief,
-      truth: { frequency: 1.0, confidence: 0.95 }
-    };
-    const factAtom = worldModel.get_atom(factBelief.atom_id);
-    if (factAtom) {
-      factAtom.meta.trust_score = 0.95;
-    }
-    agenda.push(updatedFactBelief);
-  }
-
-  // Add cooking domain data
-  worldModel.add_atom(RECIPE_SUGGESTION_SCHEMA_ATOM);
-
-  const ingredient1 = perception.process(`BELIEF: (ingredient_available chicken)`);
-  if (ingredient1) {
-    agenda.push(ingredient1[0]);
-  }
-  const ingredient2 = perception.process(`BELIEF: (ingredient_available rice)`);
-  if (ingredient2) {
-    agenda.push(ingredient2[0]);
-  }
-  
-  console.log('Initial items added to Agenda.');
-});
 
 // Store connected WebSocket clients
 const clients = new Set<WebSocket>();
+
+function broadcast(data: any) {
+  const jsonData = JSON.stringify(data);
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(jsonData);
+    }
+  });
+}
+
+
+// --- Event-based broadcasting ---
+
+function setupEventBroadcasting(agenda: Agenda, worldModel: WorldModel, goalTreeManager: GoalTreeManager) {
+    agenda.on('item_added', (item) => broadcast({ type: 'agenda_item_added', payload: item }));
+    agenda.on('item_removed', (item) => broadcast({ type: 'agenda_item_removed', payload: item }));
+    agenda.on('item_updated', (item) => broadcast({ type: 'agenda_item_updated', payload: item }));
+
+    worldModel.on('atom_added', (atom) => broadcast({ type: 'world_model_atom_added', payload: atom }));
+    worldModel.on('item_added', (item) => broadcast({ type: 'world_model_item_added', payload: item }));
+    worldModel.on('item_updated', (item) => broadcast({ type: 'world_model_item_updated', payload: item }));
+
+    goalTreeManager.on('goal_added', (goal) => broadcast({ type: 'goal_tree_goal_added', payload: goal }));
+    goalTreeManager.on('goal_updated', (goal) => broadcast({ type: 'goal_tree_goal_updated', payload: goal }));
+    goalTreeManager.on('decomposed', (data) => broadcast({ type: 'goal_tree_decomposed', payload: data }));
+}
+
 
 // WebSocket connection handling
 wss.on('connection', (ws) => {
@@ -94,9 +76,12 @@ wss.on('connection', (ws) => {
   
   // Send initial state
   const state = {
-    agenda: agenda.getItems(),
-    worldModel: worldModel.get_all_atoms(),
-    goalTree: serializeGoalTree(cognitiveCore.getModules().goalTree.get_goal_tree()),
+    type: 'full_state',
+    payload: {
+        agenda: agenda.getItems(),
+        worldModel: worldModel.get_all_atoms(),
+        goalTree: serializeGoalTree(cognitiveCore.getModules().goalTree.get_goal_tree()),
+    }
   };
   
   ws.send(JSON.stringify(state));
@@ -112,32 +97,52 @@ wss.on('connection', (ws) => {
   });
 });
 
-function broadcast(data: any) {
-  const jsonData = JSON.stringify(data);
-  clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(jsonData);
-    }
-  });
-}
 
-// Periodically broadcast the state
-setInterval(() => {
-  const goalTree = serializeGoalTree(cognitiveCore.getModules().goalTree.get_goal_tree());
+// Initialize the cognitive core
+cognitiveCore.initialize().then(async () => {
+  setupEventBroadcasting(agenda, worldModel, goalTreeManager);
+  cognitiveCore.start();
 
-  // --- DEBUGGING: Log the goal tree structure ---
-  if (Object.keys(goalTree).length > 0) {
-    console.log('Broadcasting Goal Tree Structure:', JSON.stringify(goalTree, null, 2));
+  // Add some initial items for demonstration
+  console.log('Adding initial items for demonstration...');
+
+  // Example 1: User input leading to a goal
+  const initialGoalItems = await perception.process(`GOAL: Diagnose cat illness`);
+  if (initialGoalItems.length > 0) {
+    agenda.push(initialGoalItems[0]);
   }
-  // --- END DEBUGGING ---
 
-  const state = {
-    agenda: agenda.getItems(),
-    worldModel: worldModel.get_all_atoms(),
-    goalTree: goalTree,
-  };
-  broadcast(state);
-}, 1000);
+  // Example 2: A simple belief
+  const factBeliefItems = await perception.process(`BELIEF: (is_toxic_to chocolate dog)`);
+  if (factBeliefItems.length > 0) {
+    // Set higher trust for this belief
+    const updatedFactBelief = factBeliefItems[0];
+    if (updatedFactBelief.truth) {
+        updatedFactBelief.truth.confidence = 0.95;
+    }
+    const factAtom = worldModel.get_atom(updatedFactBelief.atom_id);
+    if (factAtom) {
+      factAtom.meta.trust_score = 0.95;
+      factAtom.meta.source = 'vetdb.org';
+    }
+    agenda.push(updatedFactBelief);
+  }
+
+  // Add cooking domain data
+  worldModel.add_atom(RECIPE_SUGGESTION_SCHEMA_ATOM);
+
+  const ingredient1Items = await perception.process(`BELIEF: (ingredient_available chicken)`);
+  if (ingredient1Items.length > 0) {
+    agenda.push(ingredient1Items[0]);
+  }
+  const ingredient2Items = await perception.process(`BELIEF: (ingredient_available rice)`);
+  if (ingredient2Items.length > 0) {
+    agenda.push(ingredient2Items[0]);
+  }
+
+  console.log('Initial items added to Agenda.');
+});
+
 
 // REST API endpoints
 app.use(express.json()); // Enable JSON body parsing
@@ -158,10 +163,10 @@ app.post('/api/input', async (req, res) => {
   }
 
   try {
-    const newItem = perception.process(data);
-    if (newItem) {
-      agenda.push(newItem);
-      res.status(200).json({ message: 'Input processed successfully', newItem });
+    const newItems = await perception.process(data);
+    if (newItems && newItems.length > 0) {
+      newItems.forEach(item => agenda.push(item));
+      res.status(200).json({ message: 'Input processed successfully', newItems });
     } else {
       res.status(400).json({ error: 'Failed to process input.' });
     }
@@ -195,8 +200,12 @@ app.post('/api/goal/:id/achieve', (req, res) => {
 });
 
 // --- New Goal Composition Endpoint ---
-import { GoalCompositionModule } from './modules/goal-composition';
 const goalComposer = new GoalCompositionModule();
+
+app.get('/api/reflection', (req, res) => {
+    const reflectionData = cognitiveCore.getModules().reflection.getReflectionData();
+    res.json(reflectionData);
+});
 
 app.post('/api/compose-goal', (req, res) => {
   const { text } = req.body;
@@ -210,6 +219,20 @@ app.post('/api/compose-goal', (req, res) => {
     console.error('Error composing goal:', error);
     res.status(500).json({ error: 'Failed to compose goal.' });
   }
+});
+
+app.post('/api/sandbox/run', async (req, res) => {
+    const { hypothesis, steps } = req.body;
+    if (!hypothesis) {
+        return res.status(400).json({ error: 'Missing hypothesis in request body.' });
+    }
+    try {
+        const result = await sandboxService.run_what_if(hypothesis, steps);
+        res.json(result);
+    } catch (error) {
+        console.error('Error running sandbox:', error);
+        res.status(500).json({ error: 'Failed to run sandbox.' });
+    }
 });
 
 const port = 3001;

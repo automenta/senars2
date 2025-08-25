@@ -1,26 +1,53 @@
-import { Agenda } from '../agenda';
-import { WorldModel } from '../world-model';
-import { AttentionModule } from './attention';
-import { CognitiveItem, newCognitiveItemId, SemanticAtomMetadata, UUID } from '../types';
+import { EventEmitter } from 'events';
+import { Agenda } from '../agenda.js';
+import { WorldModel } from '../world-model.js';
+import { AttentionModule } from './attention.js';
+import { CognitiveItem, newCognitiveItemId, SemanticAtomMetadata, UUID } from '../types.js';
 
-export interface ReflectionModule {
-  start(): void;
-
-  stop(): void;
+export interface ReflectionData {
+    kpis: {
+        activeGoals: number;
+        memoryUtilization: number; // as a percentage
+        contradictionRate: number; // as a percentage
+    };
+    recommendations: {
+        id: string;
+        title: string;
+        description: string;
+        action: string;
+    }[];
+    insights: string[];
 }
 
-export class ReflectionModuleImpl implements ReflectionModule {
+export interface ReflectionModule extends EventEmitter {
+  start(): void;
+  stop(): void;
+  getReflectionData(): ReflectionData;
+}
+
+export class ReflectionModuleImpl extends EventEmitter implements ReflectionModule {
   private intervalId: NodeJS.Timeout | null = null;
   private readonly interval: number; // in milliseconds
   private agenda: Agenda;
   private worldModel: WorldModel;
   private attentionModule: AttentionModule;
+  private lastReflectionData: ReflectionData;
 
   constructor(agenda: Agenda, worldModel: WorldModel, attentionModule: AttentionModule, interval: number = 60000) {
+    super();
     this.agenda = agenda;
     this.worldModel = worldModel;
     this.attentionModule = attentionModule;
     this.interval = interval;
+    this.lastReflectionData = {
+        kpis: { activeGoals: 0, memoryUtilization: 0, contradictionRate: 0 },
+        recommendations: [],
+        insights: [],
+    };
+  }
+
+  getReflectionData(): ReflectionData {
+      return this.lastReflectionData;
   }
 
   start(): void {

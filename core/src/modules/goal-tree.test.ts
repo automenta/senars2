@@ -1,9 +1,9 @@
-import { GoalTreeManagerImpl } from './goal-tree';
-import { WorldModel } from '../world-model';
+import { GoalTreeManagerImpl } from './goal-tree.js';
+import { WorldModel } from '../world-model.js';
 import { jest } from '@jest/globals';
-import { AttentionModule } from './attention';
-import { CognitiveItem, UUID, newCognitiveItemId } from '../types';
-import { SchemaMatcher } from './schema';
+import { AttentionModule } from './attention.js';
+import { CognitiveItem, UUID, newCognitiveItemId } from '../types.js';
+import { SchemaMatcher } from './schema.js';
 
 // Mock dependencies
 const mockWorldModel = {

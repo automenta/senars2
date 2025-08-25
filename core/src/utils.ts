@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import stableStringify from 'json-stable-stringify';
-import { SemanticAtom, SemanticAtomMetadata, UUID } from './types';
+import { SemanticAtom, SemanticAtomMetadata, UUID } from './types.js';
 
 /**
  * Creates a deterministic, content-addressable ID for a SemanticAtom.

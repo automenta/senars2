@@ -1,7 +1,7 @@
-import { SemanticAtom } from './types';
-import { createSemanticAtomId } from './utils';
-import { WorldModelImpl } from './world-model';
-import { SchemaMatcherImpl } from './modules/schema';
+import { SemanticAtom } from './types.js';
+import { createSemanticAtomId } from './utils.js';
+import { WorldModelImpl } from './world-model.js';
+import { SchemaMatcherImpl } from './modules/schema.js';
 import { z } from 'zod';
 
 // --- Mock Action/Tool Implementation ---

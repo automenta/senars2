@@ -1,6 +1,6 @@
-import { CognitiveItem, UUID } from '../types';
-import { WorldModel } from '../world-model';
-import { cosineSimilarity } from '../utils';
+import { CognitiveItem, UUID } from '../types.js';
+import { WorldModel } from '../world-model.js';
+import { cosineSimilarity } from '../utils.js';
 
 export interface ResonanceModule {
   find_context(item: CognitiveItem, world_model: WorldModel, k: number): Promise<CognitiveItem[]>;

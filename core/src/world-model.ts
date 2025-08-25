@@ -1,8 +1,9 @@
+import { EventEmitter } from 'events';
 import stableStringify from 'json-stable-stringify';
 import { isPlainObject } from 'lodash-es';
-import { VectorStore, BruteForceVectorStore } from './vector-store';
-import { CognitiveItem, newCognitiveItemId, SemanticAtom, SemanticAtomMetadata, TruthValue, UUID } from './types';
-import { createSemanticAtomId } from './utils';
+import { VectorStore, BruteForceVectorStore } from './vector-store.js';
+import { CognitiveItem, newCognitiveItemId, SemanticAtom, SemanticAtomMetadata, TruthValue, UUID } from './types.js';
+import { createSemanticAtomId } from './utils.js';
 
 // --- Interfaces and Default Implementations ---
 
@@ -44,7 +45,7 @@ export class DefaultBeliefRevisionEngine implements BeliefRevisionEngine {
 // NOTE: CognitiveSchema type and its related logic have been moved to `modules/schema.ts`.
 // The WorldModel is now only responsible for storing the raw SemanticAtoms for schemas.
 
-export interface WorldModel {
+export interface WorldModel extends EventEmitter {
   add_atom(atom: SemanticAtom): UUID;
   add_item(item: CognitiveItem): void;
   update_item(id: UUID, item: CognitiveItem): void;
@@ -59,11 +60,12 @@ export interface WorldModel {
 
   revise_belief(new_item: CognitiveItem): CognitiveItem | null;
   find_or_create_atom(content: any, meta: SemanticAtomMetadata): SemanticAtom;
+  clone(): WorldModel;
 }
 
 // --- WorldModel Implementation with Indexing ---
 
-export class WorldModelImpl implements WorldModel {
+export class WorldModelImpl extends EventEmitter implements WorldModel {
   // Core Storage
   private atoms: Map<UUID, SemanticAtom> = new Map();
   private items: Map<UUID, CognitiveItem> = new Map();
@@ -80,6 +82,7 @@ export class WorldModelImpl implements WorldModel {
   private beliefRevisionEngine: BeliefRevisionEngine;
 
   constructor(vectorStore?: VectorStore, revisionEngine?: BeliefRevisionEngine) {
+    super();
     this.beliefRevisionEngine =
       revisionEngine || new DefaultBeliefRevisionEngine();
 
@@ -96,6 +99,7 @@ export class WorldModelImpl implements WorldModel {
     }
 
     this.atoms.set(atom.id, atom);
+    this.emit('atom_added', atom);
 
     // 1. Add to symbolic index (content hash -> ID)
     const contentHash = stableStringify(atom.content);
@@ -123,6 +127,7 @@ export class WorldModelImpl implements WorldModel {
       console.warn(`Item with ID ${item.id} already exists. Overwriting.`);
     }
     this.items.set(item.id, item);
+    this.emit('item_added', item);
 
     // Update the atomID -> itemID index
     const itemIds = this.atomIdToItemIds.get(item.atom_id) || new Set();
@@ -149,6 +154,7 @@ export class WorldModelImpl implements WorldModel {
   update_item(id: UUID, item: CognitiveItem): void {
     if (this.items.has(id)) {
       this.items.set(id, item);
+      this.emit('item_updated', item);
     }
   }
 
@@ -319,6 +325,8 @@ export class WorldModelImpl implements WorldModel {
       truth: mergedTruth,
     };
     this.items.set(updatedItem.id, updatedItem); // Overwrite existing item
+    this.emit('item_updated', updatedItem);
+
 
     if (this.beliefRevisionEngine.detect_conflict(existingItem.truth, new_item.truth)) {
       console.log(`Conflict detected for atom ${new_item.atom_id}`);
@@ -326,5 +334,19 @@ export class WorldModelImpl implements WorldModel {
 
     return updatedItem;
   }
-}
 
+  clone(): WorldModel {
+    const newVectorStore = new BruteForceVectorStore();
+    const newWorldModel = new WorldModelImpl(newVectorStore, this.beliefRevisionEngine);
+
+    // Deep copy atoms and items
+    for (const atom of this.atoms.values()) {
+      newWorldModel.add_atom(JSON.parse(JSON.stringify(atom)));
+    }
+    for (const item of this.items.values()) {
+      newWorldModel.add_item(JSON.parse(JSON.stringify(item)));
+    }
+
+    return newWorldModel;
+  }
+}

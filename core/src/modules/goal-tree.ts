@@ -1,11 +1,12 @@
-import { CognitiveItem, PartialCognitiveItem, UUID, newCognitiveItemId } from '../types';
+import { EventEmitter } from 'events';
+import { CognitiveItem, PartialCognitiveItem, UUID, newCognitiveItemId } from '../types.js';
+import { AttentionModule } from './attention.js';
+import { WorldModel } from '../world-model.js';
+import { SchemaMatcher } from './schema.js';
+import { GOAL_DECOMPOSITION_SCHEMA_ATOM } from '../system-schemas.js';
+import { PredictiveModelingModule } from './predictive-modeling.js';
 
-import { AttentionModule } from './attention';
-import { WorldModel } from '../world-model';
-import { SchemaMatcher } from './schema';
-import { GOAL_DECOMPOSITION_SCHEMA_ATOM } from '../utils';
-
-export interface GoalTreeManager {
+export interface GoalTreeManager extends EventEmitter {
   decompose(goal: CognitiveItem): CognitiveItem[];
 
   mark_achieved(goal_id: UUID): CognitiveItem[];
@@ -21,17 +22,20 @@ export interface GoalTreeManager {
   get_goal_tree(): Map<UUID, { item: CognitiveItem, children: Set<UUID> }>;
 }
 
-export class GoalTreeManagerImpl implements GoalTreeManager {
+export class GoalTreeManagerImpl extends EventEmitter implements GoalTreeManager {
   private goal_nodes: Map<UUID, { item: CognitiveItem, children: Set<UUID> }> = new Map();
   private dependency_to_dependents_map: Map<UUID, Set<UUID>> = new Map();
   private worldModel: WorldModel;
   private attentionModule: AttentionModule;
   private schemaMatcher: SchemaMatcher;
+  private predictionModule: PredictiveModelingModule;
 
-  constructor(worldModel: WorldModel, attentionModule: AttentionModule, schemaMatcher: SchemaMatcher) {
+  constructor(worldModel: WorldModel, attentionModule: AttentionModule, schemaMatcher: SchemaMatcher, predictionModule: PredictiveModelingModule) {
+    super();
     this.worldModel = worldModel;
     this.attentionModule = attentionModule;
     this.schemaMatcher = schemaMatcher;
+    this.predictionModule = predictionModule;
   }
 
   decompose(goal: CognitiveItem): CognitiveItem[] {
@@ -90,6 +94,7 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
     }
 
     console.log(`Decomposed goal "${goal.label}" into ${allSubGoals.length} sub-goals.`);
+    this.emit('decomposed', { parent: goal, children: allSubGoals });
     return allSubGoals;
   }
 
@@ -98,19 +103,23 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
     if (!node) return [];
 
     node.item.goal_status = 'achieved';
+    this.emit('goal_updated', node.item);
     console.log(`Goal ${node.item.label ?? goal_id} marked as ACHIEVED.`);
 
     // Propagate status to parent goals
     this.checkAndPropagateStatus(goal_id);
 
     // Check for dependent goals that can now be unblocked
-    return this.update_dependents(goal_id);
+    const unblocked_goals = this.update_dependents(goal_id);
+    unblocked_goals.forEach(goal => this.emit('goal_updated', goal));
+    return unblocked_goals;
   }
 
   mark_failed(goal_id: UUID): void {
     const node = this.goal_nodes.get(goal_id);
     if (node) {
       node.item.goal_status = 'failed';
+      this.emit('goal_updated', node.item);
       console.log(`Goal ${node.item.label ?? goal_id} marked as FAILED.`);
       
       // Propagate status to parent goals
@@ -152,6 +161,12 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
     }
 
     goal.goal_status = isBlocked ? 'blocked' : 'active';
+
+    // Add predictive modeling
+    const { time, confidence } = this.predictionModule.estimate_goal_completion(goal);
+    goal.goal_estimated_completion_time = time;
+    goal.goal_confidence_projection = confidence;
+
     console.log(`Adding goal '${goal.label}' with status: ${goal.goal_status}`);
 
     // Add to main goal nodes map
@@ -159,6 +174,8 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
       item: goal,
       children: new Set(),
     });
+    this.emit('goal_added', goal);
+
 
     // Add to parent's children set
     if (goal.goal_parent_id) {
@@ -243,6 +260,7 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
     // If the status has changed, update it and propagate the change upwards.
     if (newParentStatus !== currentParentStatus) {
       parentItem.goal_status = newParentStatus;
+      this.emit('goal_updated', parentItem);
       console.log(`Parent goal ${parentItem.label ?? parentItem.id} marked as ${newParentStatus}.`);
       // Continue propagating up the tree
       this.checkAndPropagateStatus(parentItem.id);

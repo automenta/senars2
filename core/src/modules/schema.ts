@@ -1,5 +1,5 @@
-import { CognitiveItem, CognitiveItemType, PartialCognitiveItem, SemanticAtom, UUID } from '../types';
-import { WorldModel } from '../world-model';
+import { CognitiveItem, CognitiveItemType, PartialCognitiveItem, SemanticAtom, UUID } from '../types.js';
+import { WorldModel } from '../world-model.js';
 
 export type SubGoal = {
   temp_id: string; // A temporary, schema-local ID like "step1"
@@ -130,7 +130,6 @@ export class SchemaMatcherImpl implements SchemaMatcher {
     return { ...bindings, ...labelBindings };
   }
 
-  private getBinaryBindings(a: CognitiveItem, b: CognitiveItem, schema: CognitiveSchema, worldModel: WorldModel): Record<string, any> | null {
   private getBinaryBindings(a: CognitiveItem, b: CognitiveItem, schema: CognitiveSchema, worldModel: WorldModel): Record<string, any> | null {
     const atomA = worldModel.get_atom(a.atom_id);
     const atomB = worldModel.get_atom(b.atom_id);

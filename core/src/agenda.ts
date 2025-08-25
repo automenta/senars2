@@ -1,4 +1,5 @@
-import { AttentionValue, CognitiveItem, UUID } from './types';
+import { EventEmitter } from 'events';
+import { AttentionValue, CognitiveItem, UUID } from './types.js';
 
 type Comparator<T> = (a: T, b: T) => number;
 
@@ -135,7 +136,7 @@ class PriorityQueue<T extends { id: UUID }> {
   }
 }
 
-export interface Agenda {
+export interface Agenda extends EventEmitter {
     push(item: CognitiveItem): void;
     pop(): Promise<CognitiveItem>;        // Blocking
     peek(): CognitiveItem | null;
@@ -143,13 +144,15 @@ export interface Agenda {
     updateAttention(id: UUID, newVal: AttentionValue): void;
     remove(id: UUID): boolean;
     getItems(): CognitiveItem[];
+    clone(): Agenda;
 }
 
-export class AgendaImpl implements Agenda {
+export class AgendaImpl extends EventEmitter implements Agenda {
   private queue: PriorityQueue<CognitiveItem>;
   private waitingResolvers: ((item: CognitiveItem) => void)[] = [];
 
   constructor() {
+    super();
     // Order by attention.priority (descending), so higher priority items are popped first.
     this.queue = new PriorityQueue<CognitiveItem>((a, b) => a.attention.priority - b.attention.priority);
   }
@@ -159,20 +162,26 @@ export class AgendaImpl implements Agenda {
       const resolver = this.waitingResolvers.shift();
       if (resolver) {
         resolver(item);
+        this.emit('item_added', item);
         return;
       }
     }
     this.queue.push(item);
+    this.emit('item_added', item);
   }
 
-  pop(): Promise<CognitiveItem> {
+  async pop(): Promise<CognitiveItem> {
     const item = this.queue.pop();
     if (item) {
+      this.emit('item_removed', { id: item.id });
       return Promise.resolve(item);
     }
     // If no item is available, add a resolver to the waiting list.
     return new Promise((resolve) => {
-      this.waitingResolvers.push(resolve);
+      this.waitingResolvers.push((item) => {
+        this.emit('item_removed', { id: item.id });
+        resolve(item)
+      });
     });
   }
 
@@ -185,17 +194,30 @@ export class AgendaImpl implements Agenda {
   }
 
   updateAttention(id: UUID, newVal: AttentionValue): void {
-    this.queue.update(id, (item) => ({
-      ...item,
-      attention: newVal,
-    }));
+    this.queue.update(id, (item) => {
+      const updatedItem = { ...item, attention: newVal };
+      this.emit('item_updated', updatedItem);
+      return updatedItem;
+    });
   }
 
   remove(id: UUID): boolean {
-    return this.queue.remove(id) !== undefined;
+    const removed = this.queue.remove(id) !== undefined;
+    if (removed) {
+        this.emit('item_removed', { id });
+    }
+    return removed;
   }
 
   getItems(): CognitiveItem[] {
     return this.queue.getItems();
+  }
+
+  clone(): Agenda {
+    const newAgenda = new AgendaImpl();
+    for (const item of this.getItems()) {
+      newAgenda.push(JSON.parse(JSON.stringify(item)));
+    }
+    return newAgenda;
   }
 }

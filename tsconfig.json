@@ -1,4 +1,8 @@
 {
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  },
   "compilerOptions": {
     "target": "ESNext",
     "module": "NodeNext",
@@ -26,5 +30,5 @@
       ]
     }
   },
-  "exclude": ["node_modules", "gui"]
+  "exclude": ["node_modules", "gui", "dist"]
 }

@@ -1,6 +1,6 @@
-import { CognitiveItem, newCognitiveItemId, SemanticAtomMetadata, UUID } from '../types';
-import { WorldModel } from '../world-model';
-import { AttentionModule } from './attention';
+import { CognitiveItem, newCognitiveItemId, SemanticAtomMetadata, UUID } from '../types.js';
+import { WorldModel } from '../world-model.js';
+import { AttentionModule } from './attention.js';
 
 export interface Transducer {
   can_process(data: any): boolean;

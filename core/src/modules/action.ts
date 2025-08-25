@@ -1,5 +1,5 @@
-import { CognitiveItem, newCognitiveItemId, SemanticAtomMetadata, UUID } from '../types';
-import { WorldModel } from '../world-model';
+import { CognitiveItem, newCognitiveItemId, SemanticAtomMetadata, UUID } from '../types.js';
+import { WorldModel } from '../world-model.js';
 
 // Assuming google_web_search is a globally available function provided by the environment.
 declare const google_web_search: (query: string) => Promise<{ output: string }>;

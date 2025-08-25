@@ -1,8 +1,8 @@
-import { AgendaImpl } from './agenda';
-import { WorldModelImpl } from './world-model';
-import { CognitiveCore } from './cognitive-core';
-import { PerceptionModule } from './perception';
-import { AttentionModuleImpl } from './modules/attention';
+import { AgendaImpl } from './agenda.js';
+import { WorldModelImpl } from './world-model.js';
+import { CognitiveCore } from './cognitive-core.js';
+import { PerceptionSubsystem } from './modules/perception.js';
+import { AttentionModuleImpl } from './modules/attention.js';
 
 describe('Integration Test', () => {
   it('should process a simple goal and belief', async () => {
@@ -10,7 +10,7 @@ describe('Integration Test', () => {
     const agenda = new AgendaImpl();
     const worldModel = new WorldModelImpl();
     const attentionModule = new AttentionModuleImpl();
-    const perception = new PerceptionModule(worldModel, attentionModule);
+    const perception = new PerceptionSubsystem(worldModel, attentionModule);
     
     const cognitiveCore = new CognitiveCore(agenda, worldModel);
     
@@ -18,28 +18,23 @@ describe('Integration Test', () => {
     await cognitiveCore.initialize();
     
     // Add a simple belief
-    const beliefItem = perception.process('BELIEF: (is_toxic_to chocolate dog)');
-    expect(beliefItem).not.toBeNull();
-    if (beliefItem) {
-      agenda.push(beliefItem);
+    const beliefItems = await perception.process('BELIEF: (is_toxic_to chocolate dog)');
+    expect(beliefItems.length).toBeGreaterThan(0);
+    if (beliefItems.length > 0) {
+      agenda.push(beliefItems[0]);
     }
     
     // Add a simple goal
-    const goalItem = perception.process('GOAL: Diagnose cat illness');
-    expect(goalItem).not.toBeNull();
-    if (goalItem) {
-      agenda.push(goalItem);
+    const goalItems = await perception.process('GOAL: Diagnose cat illness');
+    expect(goalItems.length).toBeGreaterThan(0);
+    if (goalItems.length > 0) {
+      agenda.push(goalItems[0]);
     }
     
     // Check that items were added to agenda
     expect(agenda.size()).toBe(2);
     
-    // Check that items were added to world model
-    const allItems = worldModel.get_all_items();
-    expect(allItems.length).toBe(2);
-    
-    const allAtoms = worldModel.get_all_atoms();
-    expect(allAtoms.length).toBe(2);
+    // The items are not yet in the world model until processed by the core
     
     console.log('Integration test passed');
   }, 10000); // 10 second timeout

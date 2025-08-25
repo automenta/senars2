@@ -1,6 +1,6 @@
-import { DefaultBeliefRevisionEngine, WorldModelImpl } from './world-model';
-import { CognitiveItem, newCognitiveItemId, SemanticAtom, TruthValue, UUID } from './types';
-import { createSemanticAtomId } from './utils';
+import { DefaultBeliefRevisionEngine, WorldModelImpl } from './world-model.js';
+import { CognitiveItem, newCognitiveItemId, SemanticAtom, TruthValue, UUID } from './types.js';
+import { createSemanticAtomId } from './utils.js';
 
 // Helper to create a dummy SemanticAtom
 const createAtom = (content: any, embedding: number[] = []): SemanticAtom => {
@@ -154,100 +154,6 @@ describe('WorldModelImpl', () => {
         const results = worldModel.query_by_structure('$[?(@.type=="animal")]', 1);
         expect(results.length).toBe(1);
       });
-    });
-  });
-
-  describe('Schema Registration and Application', () => {
-    const schemaDefinition = {
-      if: {
-        a: { type: 'GOAL' },
-        b: { type: 'BELIEF' },
-      },
-      then: {
-        type: 'BELIEF',
-        label_template: 'Achieved: {{a.label}}',
-        atom_id_from: 'b',
-      },
-    };
-
-    const schemaAtom = createAtom(schemaDefinition);
-    schemaAtom.meta.type = 'CognitiveSchema';
-
-    // Helper for creating different item types
-    const createItem = (
-      atom: SemanticAtom,
-      type: 'GOAL' | 'BELIEF' | 'QUERY',
-      label: string,
-    ): CognitiveItem => ({
-      id: newCognitiveItemId(),
-      atom_id: atom.id,
-      type,
-      label,
-      attention: { priority: 0.5, durability: 0.5 },
-      truth: type === 'BELIEF' ? { frequency: 1, confidence: 1 } : undefined,
-      stamp: {
-        timestamp: Date.now(),
-        parent_ids: [],
-        schema_id: 'initial' as UUID,
-      },
-    });
-
-    it('should return null if trying to register a non-schema atom', () => {
-      const notASchemaAtom = createAtom({ info: 'fact' }); // type is 'Fact' by default
-      const result = worldModel.register_schema_atom(notASchemaAtom);
-      expect(result).toBeNull();
-    });
-
-    it('should return null for a malformed schema definition', () => {
-      const malformedAtom = createAtom({ if: {} /* no 'then' */ });
-      malformedAtom.meta.type = 'CognitiveSchema';
-      const result = worldModel.register_schema_atom(malformedAtom);
-      expect(result).toBeNull();
-    });
-
-    it('should successfully register a valid schema', () => {
-      const result = worldModel.register_schema_atom(schemaAtom);
-      expect(result).not.toBeNull();
-      expect(result?.atom_id).toBe(schemaAtom.id);
-      expect(typeof result?.apply).toBe('function');
-    });
-
-    it('should correctly apply a registered schema to matching items', () => {
-      const compiledSchema = worldModel.register_schema_atom(schemaAtom);
-      expect(compiledSchema).not.toBeNull();
-
-      const goalAtom = createAtom({ task: 'do something' });
-      const beliefAtom = createAtom({ state: 'it is done' });
-
-      const goalItem = createItem(goalAtom, 'GOAL', 'My Goal');
-      const beliefItem = createItem(beliefAtom, 'BELIEF', 'Confirmation');
-
-      const derivedItems = compiledSchema!.apply(goalItem, beliefItem);
-
-      expect(derivedItems).toHaveLength(1);
-      const derived = derivedItems[0];
-
-      expect(derived.type).toBe('BELIEF');
-      expect(derived.label).toBe('Achieved: My Goal');
-      expect(derived.atom_id).toBe(beliefAtom.id);
-      expect(derived.stamp.schema_id).toBe(schemaAtom.id);
-      expect(derived.stamp.parent_ids).toEqual([goalItem.id, beliefItem.id]);
-    });
-
-    it('should not apply a schema to non-matching items', () => {
-      const compiledSchema = worldModel.register_schema_atom(schemaAtom);
-      expect(compiledSchema).not.toBeNull();
-
-      const goalAtom = createAtom({ task: 'do something' });
-      const anotherGoalAtom = createAtom({ state: 'another goal' });
-
-      const goalItem = createItem(goalAtom, 'GOAL', 'My Goal');
-      // The schema expects a BELIEF as the second item, not another GOAL
-      const anotherGoalItem = createItem(anotherGoalAtom, 'GOAL', 'Another Goal');
-
-      const derivedItems = compiledSchema!.apply(goalItem, anotherGoalItem);
-
-      expect(derivedItems).toHaveLength(0);
     });
   });
 });

@@ -1,5 +1,6 @@
-import { CognitiveSchemaContent, SemanticAtom, SemanticAtomMetadata } from './types';
-import { createSemanticAtomId } from './utils';
+import { SemanticAtom, SemanticAtomMetadata } from './types.js';
+import { CognitiveSchemaContent } from './modules/schema.js';
+import { createSemanticAtomId } from './utils.js';
 
 // --- Decomposition Schema for Diagnosing Toxicity ---
 

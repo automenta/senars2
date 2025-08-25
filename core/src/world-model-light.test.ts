@@ -1,7 +1,7 @@
-import { WorldModelImpl } from './world-model';
-import { BruteForceVectorStore } from './vector-store';
+import { WorldModelImpl } from './world-model.js';
+import { BruteForceVectorStore } from './vector-store.js';
 import { jest } from '@jest/globals';
-import { SemanticAtom, CognitiveItem } from './types';
+import { SemanticAtom, CognitiveItem, UUID } from './types.js';
 
 jest.setTimeout(60000);
 
@@ -12,36 +12,40 @@ describe('WorldModelImpl', () => {
 
     // Atom for the file
     const fileAtom: SemanticAtom = {
-      id: 'atom1',
+      id: 'atom1' as UUID,
       content: { type: 'file', attributes: { path: '/test/file.txt', content: 'hello world' } },
       embedding: [],
-      meta: { timestamp: new Date().toISOString() },
+      meta: { type: 'Fact', timestamp: new Date().toISOString() },
     };
     model.add_atom(fileAtom);
 
     // Item for the file
     const fileItem: CognitiveItem = {
-      id: 'item1',
-      atom_id: 'atom1',
+      id: 'item1' as UUID,
+      atom_id: 'atom1' as UUID,
       type: 'BELIEF',
+      attention: { priority: 0.5, durability: 0.5 },
+      stamp: { timestamp: Date.now(), parent_ids: [], schema_id: 'test' as UUID },
       truth: { frequency: 1, confidence: 1 },
     };
     model.add_item(fileItem);
 
     // Atom for the directory
     const dirAtom: SemanticAtom = {
-      id: 'atom2',
+      id: 'atom2' as UUID,
       content: { type: 'directory', attributes: { path: '/test' } },
       embedding: [],
-      meta: { timestamp: new Date().toISOString() },
+      meta: { type: 'Fact', timestamp: new Date().toISOString() },
     };
     model.add_atom(dirAtom);
 
     // Item for the directory
     const dirItem: CognitiveItem = {
-        id: 'item2',
-        atom_id: 'atom2',
+        id: 'item2' as UUID,
+        atom_id: 'atom2' as UUID,
         type: 'BELIEF',
+        attention: { priority: 0.5, durability: 0.5 },
+        stamp: { timestamp: Date.now(), parent_ids: [], schema_id: 'test' as UUID },
         truth: { frequency: 1, confidence: 1 },
     };
     model.add_item(dirItem);
