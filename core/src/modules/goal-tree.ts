@@ -15,6 +15,8 @@ export interface GoalTreeManager {
 
   add_goal(goal: CognitiveItem): void;
   
+  get_sub_goals(goal_id: UUID): UUID[];
+
   get_goal_tree(): Map<UUID, { item: CognitiveItem, children: Set<UUID> }>;
 }
 
@@ -131,6 +133,11 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
         parentNode.children.add(goal.id);
       }
     }
+  }
+
+  public get_sub_goals(goal_id: UUID): UUID[] {
+    const node = this.goal_nodes.get(goal_id);
+    return node ? Array.from(node.children) : [];
   }
 
   public get_goal_tree(): Map<UUID, { item: CognitiveItem, children: Set<UUID> }> {

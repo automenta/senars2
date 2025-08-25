@@ -181,6 +181,24 @@ app.post('/api/goal/:id/achieve', (req, res) => {
   }
 });
 
+// --- New Goal Composition Endpoint ---
+import { GoalCompositionModule } from './modules/goal-composition';
+const goalComposer = new GoalCompositionModule();
+
+app.post('/api/compose-goal', (req, res) => {
+  const { text } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: 'Missing text in request body.' });
+  }
+  try {
+    const composition = goalComposer.compose({ text });
+    res.json(composition);
+  } catch (error) {
+    console.error('Error composing goal:', error);
+    res.status(500).json({ error: 'Failed to compose goal.' });
+  }
+});
+
 const port = 3001;
 server.listen(port, () => {
   console.log(`Server is listening on http://localhost:${port}`);

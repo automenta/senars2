@@ -8,7 +8,7 @@ class PriorityQueue<T extends { id: UUID }> {
   private comparator: Comparator<T>;
 
   constructor(comparator: Comparator<T>) {
-    this.comparator = (a, b) => Math.sign(comparator(a, b));
+    this.comparator = comparator;
   }
 
   public get length(): number {
@@ -47,7 +47,7 @@ class PriorityQueue<T extends { id: UUID }> {
 
   public update(id: UUID, updateFn: (item: T) => T): boolean {
     const index = this.itemIndex.get(id);
-    if (index === undefined) {
+    if (index === undefined || index >= this.heap.length) {
       return false;
     }
     const oldItem = this.heap[index];
@@ -57,7 +57,7 @@ class PriorityQueue<T extends { id: UUID }> {
     const comparison = this.comparator(newItem, oldItem);
     if (comparison > 0) {
       this.siftUp(index);
-    } else if (comparison < 0) {
+    } else {
       this.siftDown(index);
     }
     return true;
@@ -65,22 +65,28 @@ class PriorityQueue<T extends { id: UUID }> {
 
   public remove(id: UUID): T | undefined {
     const index = this.itemIndex.get(id);
-    if (index === undefined) {
+    if (index === undefined || index >= this.heap.length) {
       return undefined;
     }
-    if (index === this.heap.length - 1) {
-      const item = this.heap.pop();
-      if (item) this.itemIndex.delete(item.id);
-      return item;
-    }
+
+    const itemToRemove = this.heap[index];
     this.swap(index, this.heap.length - 1);
-    const item = this.heap.pop();
-    if (item) {
-      this.itemIndex.delete(item.id);
+    this.heap.pop();
+    this.itemIndex.delete(id);
+
+    // If the item was the last one, no need to heapify
+    if (index < this.heap.length) {
+        const item = this.heap[index];
+        const parentIndex = this.parent(index);
+        // If it's the root or its priority is less than its parent, sift down
+        if (index === 0 || this.comparator(this.heap[parentIndex], item) > 0) {
+            this.siftDown(index);
+        } else { // Otherwise, sift up
+            this.siftUp(index);
+        }
     }
-    this.siftUp(index);
-    this.siftDown(index);
-    return item;
+
+    return itemToRemove;
   }
 
   private parent(i: number): number {
@@ -149,23 +155,14 @@ export class AgendaImpl implements Agenda {
   }
 
   push(item: CognitiveItem): void {
-    this.queue.push(item);
-    // If there are waiting consumers, resolve the promise with the highest priority item.
-    // The item just pushed might be the new highest priority.
     if (this.waitingResolvers.length > 0) {
       const resolver = this.waitingResolvers.shift();
       if (resolver) {
-        // Pop the highest priority item from the queue and resolve the waiting promise.
-        const highestPriorityItem = this.queue.pop();
-        if (highestPriorityItem) {
-          resolver(highestPriorityItem);
-        } else {
-          // This case should ideally not happen if an item was just pushed and resolvers are waiting.
-          // But as a fallback, push the resolver back if no item was found.
-          this.waitingResolvers.unshift(resolver);
-        }
+        resolver(item);
+        return;
       }
     }
+    this.queue.push(item);
   }
 
   pop(): Promise<CognitiveItem> {

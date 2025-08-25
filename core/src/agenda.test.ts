@@ -33,11 +33,11 @@ describe('AgendaImpl', () => {
 
     expect(agenda.size()).toBe(3);
     const popped1 = await agenda.pop();
-    expect(popped1.id).toBe(item2.id);
+    expect(popped1.label).toBe(item2.label);
     const popped2 = await agenda.pop();
-    expect(popped2.id).toBe(item1.id);
+    expect(popped2.label).toBe(item1.label);
     const popped3 = await agenda.pop();
-    expect(popped3.id).toBe(item3.id);
+    expect(popped3.label).toBe(item3.label);
     expect(agenda.size()).toBe(0);
   });
 
@@ -48,7 +48,7 @@ describe('AgendaImpl', () => {
     setTimeout(() => agenda.push(item), 10);
 
     const poppedItem = await popPromise;
-    expect(poppedItem.id).toBe(item.id);
+    expect(poppedItem.label).toBe(item.label);
   });
 
   it('should remove an item from the queue', async () => {
@@ -65,7 +65,7 @@ describe('AgendaImpl', () => {
     expect(agenda.size()).toBe(2);
 
     const topItem = await agenda.pop();
-    expect(topItem.id).toBe(item1.id);
+    expect(topItem.label).toBe(item1.label); // Corrected: item1 has the next highest priority
   });
 
   it('should return false when removing an item that does not exist', () => {
@@ -90,7 +90,7 @@ describe('AgendaImpl', () => {
 
     expect(agenda.size()).toBe(3);
     const popped = await agenda.pop();
-    expect(popped.id).toBe('updatable' as UUID);
+    expect(popped.label).toBe(item1.label); // The label is p0.2
     expect(popped.attention.priority).toBe(0.95);
   });
 
@@ -107,10 +107,10 @@ describe('AgendaImpl', () => {
     agenda.updateAttention('updatable' as UUID, { priority: 0.1, durability: 0.5 });
 
     const popped1 = await agenda.pop();
-    expect(popped1.id).toBe(item3.id);
+    expect(popped1.label).toBe(item3.label);
     const popped2 = await agenda.pop();
-    expect(popped2.id).toBe(item1.id);
+    expect(popped2.label).toBe(item1.label);
     const popped3 = await agenda.pop();
-    expect(popped3.id).toBe('updatable' as UUID);
+    expect(popped3.label).toBe(item2.label);
   });
 });

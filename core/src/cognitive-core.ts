@@ -86,156 +86,162 @@ export class CognitiveCore {
 
   private async worker_loop(): Promise<void> {
     while (this.running) {
-      const current_item = await this.agenda.pop();
-      console.log(`Processing item: ${current_item.label ?? current_item.id}`);
+      const item = await this.agenda.pop();
+      console.log(`Processing item: ${item.label ?? item.id}`);
 
       try {
-        // 1. Contextualize
-        const contextItems = await this.modules.resonance.find_context(current_item, this.worldModel, 10);
-
-        // 2. Goal Decomposition
-        if (current_item.type === 'GOAL') {
-          // Always attempt to decompose a goal first.
-          const subGoals = this.modules.goalTree.decompose(current_item, this.worldModel, this.modules.attention);
-          if (subGoals.length > 0) {
-            subGoals.forEach(subGoal => this.agenda.push(subGoal));
-            console.log(`Goal ${current_item.label ?? current_item.id} decomposed into ${subGoals.length} sub-goals.`);
-            // After decomposition, we can skip the rest of the loop for this item.
-            continue;
-          } else {
-             // If no decomposition, try to execute it as an action.
-            const resultItem = await this.modules.action.executeGoal(current_item);
-            if (resultItem) {
-              this.agenda.push(resultItem);
-              this.modules.goalTree.mark_achieved(current_item.id);
-              console.log(`Goal ${current_item.label ?? current_item.id} executed by ActionSubsystem.`);
-              this.modules.attention.update_on_access([current_item], this.worldModel);
-              continue;
-            }
-            console.warn(`Goal ${current_item.label ?? current_item.id} could not be decomposed or executed. Tracking as a primary goal.`);
-            this.modules.goalTree.add_goal(current_item);
-          }
+        // Step 1: Handle Goals
+        if (item.type === 'GOAL') {
+          const goalHandled = await this.handleGoalProcessing(item);
+          if (goalHandled) continue; // Skip to next item if goal was decomposed or executed
         }
 
-        // 3. Reason - Apply schemas to pairs of items
-        for (const itemB of contextItems) {
-          const schemas = this.modules.matcher.find_applicable(current_item, itemB, this.worldModel);
-          for (const schema of schemas) {
-            try {
-              // Get the schema atom to access trust score
-              const schemaAtom = this.worldModel.get_atom(schema.atom_id);
-              const sourceTrust = schemaAtom?.meta.trust_score ?? 0.5;
-              
-              // Apply the schema
-              const derivedItems = [schema.content].map(thenClause => {
-                let label = thenClause.then.label_template || 'New Derived Item';
-                if (current_item.label) {
-                  label = label.replace('{{a.label}}', current_item.label);
-                }
-                if (itemB.label) {
-                  label = label.replace('{{b.label}}', itemB.label);
-                }
+        // Step 2: Contextualize and Reason
+        const contextItems = await this.modules.resonance.find_context(item, this.worldModel, 10);
+        await this.applySchemas(item, contextItems);
 
-                let atom_id: UUID;
-                let content: any = {};
-
-                if (thenClause.then.atom_id_from === 'a') {
-                  atom_id = current_item.atom_id;
-                  content = this.worldModel.get_atom(current_item.atom_id)?.content || {};
-                } else if (thenClause.then.atom_id_from === 'b') {
-                  atom_id = itemB.atom_id;
-                  content = this.worldModel.get_atom(itemB.atom_id)?.content || {};
-                } else {
-                  // Create a new atom based on content_template or a generic one
-                  content = thenClause.then.content_template || { 
-                    derived_from: [current_item.atom_id, itemB.atom_id].filter(Boolean) 
-                  };
-                  const newAtom = this.worldModel.find_or_create_atom(content, {
-                    type: 'Fact',
-                    source: 'system_schema_derivation',
-                    schema_id: schema.atom_id,
-                  });
-                  atom_id = newAtom.id;
-                }
-
-                return {
-                  atom_id: atom_id,
-                  type: thenClause.then.type,
-                  truth: thenClause.then.truth || { frequency: 1.0, confidence: 0.7 },
-                  goal_parent_id: current_item.type === 'GOAL' ? current_item.id : 
-                                  itemB.type === 'GOAL' ? itemB.id : undefined,
-                  label,
-                  stamp: {
-                    timestamp: Date.now(),
-                    parent_ids: [current_item.id, itemB.id],
-                    schema_id: schema.atom_id,
-                    module: 'SchemaMatcher',
-                  },
-                } as Omit<CognitiveItem, 'id' | 'attention'>;
-              });
-
-              // Process derived items
-              for (const derived of derivedItems) {
-                const attention = this.modules.attention.calculate_derived(
-                  [current_item, itemB],
-                  schema.atom_id,
-                  sourceTrust,
-                );
-
-                const stamp: DerivationStamp = {
-                  timestamp: Date.now(),
-                  parent_ids: derived.stamp.parent_ids,
-                  schema_id: derived.stamp.schema_id,
-                  module: 'SchemaMatcher',
-                };
-
-                const newItem: CognitiveItem = {
-                  ...derived,
-                  id: newCognitiveItemId(),
-                  attention,
-                  stamp,
-                };
-
-                this.agenda.push(newItem);
-                console.log(`Pushed derived item to agenda: ${newItem.label ?? newItem.id}`);
-
-                // Update goal tree if this is a belief that achieves a goal
-                if (newItem.type === 'BELIEF' && newItem.goal_parent_id) {
-                  this.modules.goalTree.mark_achieved(newItem.goal_parent_id);
-                }
-              }
-            } catch (error) {
-              console.warn(`Schema ${schema.atom_id} failed to apply`, error);
-            }
-          }
+        // Step 3: Memorize Beliefs
+        if (item.type === 'BELIEF') {
+          await this.memorizeBelief(item);
         }
 
-        // 4. Memorize
-        if (current_item.type === 'BELIEF') {
-          const revisedItem = this.worldModel.revise_belief(current_item);
-          if (revisedItem) {
-            revisedItem.attention = this.modules.attention.calculate_initial(revisedItem);
-            this.agenda.push(revisedItem);
-          }
-        }
-
-        // 5. Reinforce
-        this.modules.attention.update_on_access([current_item, ...contextItems], this.worldModel);
-
-        // 6. Update goal tree for achieved goals
-        if (current_item.type === 'GOAL' && this.is_achieved(current_item)) {
-          this.modules.goalTree.mark_achieved(current_item.id);
+        // Step 4: Update Attention and Goal Status
+        this.modules.attention.update_on_access([item, ...contextItems], this.worldModel);
+        if (item.type === 'GOAL' && await this.is_achieved(item)) {
+          this.modules.goalTree.mark_achieved(item.id);
         }
 
       } catch (e) {
-        console.error(`Worker failed while processing item ${current_item.id}`, e);
+        console.error(`Worker failed while processing item ${item.id}`, e);
       }
     }
   }
 
-  private is_achieved(item: CognitiveItem): boolean {
-    // Simple implementation - in a real system, this would check if the goal's conditions are met
-    // For now, we'll just check if it has a result or if it's marked as achieved
-    return item.goal_status === 'achieved';
+  /**
+   * Handles the processing of a GOAL item, attempting to decompose or execute it.
+   * @returns True if the goal was handled (decomposed or executed), false otherwise.
+   */
+  private async handleGoalProcessing(item: CognitiveItem): Promise<boolean> {
+    // Attempt to decompose the goal into sub-goals.
+    const subGoals = this.modules.goalTree.decompose(item, this.worldModel, this.modules.attention);
+    if (subGoals.length > 0) {
+      subGoals.forEach(subGoal => this.agenda.push(subGoal));
+      console.log(`Goal ${item.label ?? item.id} decomposed into ${subGoals.length} sub-goals.`);
+      return true;
+    }
+
+    // If not decomposed, attempt to execute it as an action.
+    const resultItem = await this.modules.action.executeGoal(item);
+    if (resultItem) {
+      this.agenda.push(resultItem);
+      this.modules.goalTree.mark_achieved(item.id);
+      console.log(`Goal ${item.label ?? item.id} executed by ActionSubsystem.`);
+      this.modules.attention.update_on_access([item], this.worldModel);
+      return true;
+    }
+
+    // If it can't be decomposed or executed, track it as a primary goal.
+    console.warn(`Goal ${item.label ?? item.id} could not be decomposed or executed. Tracking as a primary goal.`);
+    this.modules.goalTree.add_goal(item);
+    return false;
+  }
+
+  /**
+   * Finds and applies relevant schemas to a pair of cognitive items.
+   */
+  private async applySchemas(itemA: CognitiveItem, contextItems: CognitiveItem[]): Promise<void> {
+    for (const itemB of contextItems) {
+      const schemas = this.modules.matcher.find_applicable(itemA, itemB, this.worldModel);
+      for (const schema of schemas) {
+        try {
+          const derivedItems = await this.createDerivedItems(schema, itemA, itemB);
+          for (const newItem of derivedItems) {
+            this.agenda.push(newItem);
+            console.log(`Pushed derived item to agenda: ${newItem.label ?? newItem.id}`);
+            if (newItem.type === 'BELIEF' && newItem.goal_parent_id) {
+              this.modules.goalTree.mark_achieved(newItem.goal_parent_id);
+            }
+          }
+        } catch (error) {
+          console.warn(`Schema ${schema.atom_id} failed to apply`, error);
+        }
+      }
+    }
+  }
+
+  /**
+   * Creates new cognitive items based on a schema and parent items.
+   */
+  private async createDerivedItems(schema: any, itemA: CognitiveItem, itemB: CognitiveItem): Promise<CognitiveItem[]> {
+    const schemaAtom = this.worldModel.get_atom(schema.atom_id);
+    const sourceTrust = schemaAtom?.meta.trust_score ?? 0.5;
+
+    const thenClause = schema.content.then;
+    let label = thenClause.label_template || 'New Derived Item';
+    label = label.replace('{{a.label}}', itemA.label || 'itemA').replace('{{b.label}}', itemB.label || 'itemB');
+
+    let atom_id: UUID;
+    if (thenClause.atom_id_from === 'a') {
+      atom_id = itemA.atom_id;
+    } else if (thenClause.atom_id_from === 'b') {
+      atom_id = itemB.atom_id;
+    } else {
+      const content = thenClause.content_template || { derived_from: [itemA.atom_id, itemB.atom_id].filter(Boolean) };
+      const newAtom = this.worldModel.find_or_create_atom(content, {
+        type: 'Fact',
+        source: 'system_schema_derivation',
+        schema_id: schema.atom_id,
+      });
+      atom_id = newAtom.id;
+    }
+
+    const attention = this.modules.attention.calculate_derived([itemA, itemB], schema.atom_id, sourceTrust);
+    const stamp: DerivationStamp = {
+      timestamp: Date.now(),
+      parent_ids: [itemA.id, itemB.id],
+      schema_id: schema.atom_id,
+      module: 'SchemaMatcher',
+    };
+
+    const newItem: CognitiveItem = {
+      id: newCognitiveItemId(),
+      atom_id,
+      attention,
+      stamp,
+      type: thenClause.type,
+      truth: thenClause.truth || { frequency: 1.0, confidence: 0.7 },
+      goal_parent_id: itemA.type === 'GOAL' ? itemA.id : itemB.type === 'GOAL' ? itemB.id : undefined,
+      label,
+    };
+
+    return [newItem];
+  }
+
+  /**
+   * Revises a belief in the world model.
+   */
+  private async memorizeBelief(item: CognitiveItem): Promise<void> {
+    const revisedItem = this.worldModel.revise_belief(item);
+    if (revisedItem) {
+      revisedItem.attention = this.modules.attention.calculate_initial(revisedItem);
+      this.agenda.push(revisedItem);
+    }
+  }
+
+  /**
+   * Checks if a goal is achieved.
+   * A goal is achieved if its status is 'achieved' or if all its sub-goals are achieved.
+   */
+  private async is_achieved(item: CognitiveItem): Promise<boolean> {
+    if (item.goal_status === 'achieved') {
+      return true;
+    }
+    // A goal is also considered achieved if it has subgoals and all of them are achieved.
+    const subGoalIds = this.modules.goalTree.get_sub_goals(item.id);
+    if (subGoalIds.length > 0) {
+      const subGoals = subGoalIds.map(id => this.worldModel.get_item(id)).filter(Boolean) as CognitiveItem[];
+      return subGoals.every(sg => sg.goal_status === 'achieved');
+    }
+    return false;
   }
 }
