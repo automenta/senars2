@@ -5,8 +5,10 @@ import { isEqual, isMatch } from 'lodash';
 // A simple representation of a schema's application logic
 type CompiledSchema = (a: CognitiveItem, b: CognitiveItem, a_atom: SemanticAtom, b_atom: SemanticAtom) => Omit<CognitiveItem, 'id' | 'attention' | 'stamp'> | null;
 
-// Augment CognitiveSchema to hold the compiled function
-export type AppliableCognitiveSchema = CognitiveSchema & {
+// A self-contained type for a schema that has been compiled into an executable function.
+export type AppliableCognitiveSchema = {
+    atom_id: UUID;
+    compiled_content: any;
     apply: CompiledSchema;
 };
 
@@ -40,7 +42,7 @@ export class SchemaMatcherImpl implements SchemaMatcher {
         if (compiledSchema) {
             this.schemas.push({
                 atom_id: atom.id,
-                compiled: atom.content,
+                compiled_content: atom.content,
                 apply: compiledSchema,
             });
             console.log(`Registered schema: ${atom.id}`);

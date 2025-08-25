@@ -2,11 +2,13 @@ import { CognitiveItem, AttentionValue } from '../types';
 import { WorldModel, CognitiveSchema } from '../world-model';
 import { Agenda } from '../agenda';
 
+import { UUID } from '../types';
+
 export interface AttentionModule {
     calculate_initial(item: CognitiveItem): AttentionValue;
     calculate_derived(
         parents: CognitiveItem[],
-        schema: CognitiveSchema,
+        schema_id: UUID,
         source_trust?: number
     ): AttentionValue;
     update_on_access(items: CognitiveItem[], world_model: WorldModel): void;
@@ -40,7 +42,7 @@ export class AttentionModuleImpl implements AttentionModule {
 
     calculate_derived(
         parents: CognitiveItem[],
-        schema: CognitiveSchema,
+        schema_id: UUID, // The schema itself is not used, only its trust, so we just need the ID.
         source_trust: number = 0.5
     ): AttentionValue {
         if (parents.length === 0) {

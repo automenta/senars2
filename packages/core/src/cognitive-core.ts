@@ -27,6 +27,12 @@ export class CognitiveCore {
         this.modules = modules;
     }
 
+    public async initialize(): Promise<void> {
+        console.log("Initializing CognitiveCore modules...");
+        await this.modules.action.initialize();
+        console.log("CognitiveCore modules initialized.");
+    }
+
     public start(): void {
         if (this.running) {
             console.log("CognitiveCore is already running.");
@@ -40,9 +46,11 @@ export class CognitiveCore {
         });
     }
 
-    public stop(): void {
+    public async stop(): Promise<void> {
+        if (!this.running) return;
         this.running = false;
-        console.log("CognitiveCore stopped.");
+        await this.modules.action.cleanup();
+        console.log("CognitiveCore stopped and cleaned up.");
     }
 
     private async worker_loop(): Promise<void> {
@@ -56,16 +64,50 @@ export class CognitiveCore {
 
                 // 2. Action
                 if (current_item.type === 'GOAL') {
-                    const executor = this.modules.action.find_executor(current_item);
-                    if (executor) {
-                        console.log(`Found executor for goal: ${current_item.label ?? current_item.id}`);
-                        const result_item = await executor.execute(current_item, this.worldModel);
-                        this.agenda.push(result_item);
-                        // Mark goal as achieved since an action produced a result for it
-                        this.modules.goalTree.mark_achieved(current_item.id);
-                        continue; // Move to next item in agenda
+                    const tools = this.modules.action.getTools();
+                    const toolToExecute = tools.find(t => t.name === current_item.label);
+
+                    if (toolToExecute) {
+                        console.log(`Executing tool: ${toolToExecute.name}`);
+                        const goalAtom = this.worldModel.get_atom(current_item.atom_id);
+                        const toolInput = goalAtom?.content ?? {};
+
+                        try {
+                            const output = await toolToExecute.invoke(toolInput);
+                            const resultAtom = this.worldModel.find_or_create_atom(
+                                { result: output },
+                                {
+                                    type: 'Observation',
+                                    source: toolToExecute.name,
+                                }
+                            );
+
+                            const beliefItem: CognitiveItem = {
+                                id: newCognitiveItemId(),
+                                atom_id: resultAtom.id,
+                                type: 'BELIEF',
+                                truth: { frequency: 1.0, confidence: 1.0 }, // Tool outputs are treated as facts for now
+                                attention: this.modules.attention.calculate_initial({ type: 'BELIEF' } as CognitiveItem),
+                                stamp: {
+                                    timestamp: Date.now(),
+                                    parent_ids: [current_item.id],
+                                    schema_id: 'tool-execution' as any, // Special ID for tool execution
+                                },
+                                goal_parent_id: current_item.id,
+                                label: `Result from ${toolToExecute.name}`,
+                            };
+
+                            this.agenda.push(beliefItem);
+                            this.modules.goalTree.mark_achieved(current_item.id);
+                            console.log(`Tool ${toolToExecute.name} executed successfully.`);
+                            // Continue to the next item, as this goal has been handled.
+                            continue;
+                        } catch (error) {
+                            console.error(`Tool ${toolToExecute.name} failed to execute:`, error);
+                            this.modules.goalTree.mark_failed(current_item.id);
+                        }
                     } else {
-                        // If no executor, just track it for now
+                        // If no tool found, just track it as a goal for now.
                         (this.modules.goalTree as GoalTreeManagerImpl).add_goal(current_item);
                     }
                 }
@@ -74,11 +116,16 @@ export class CognitiveCore {
                 const derivedItems = this.modules.matcher.find_and_apply_schemas(current_item, contextItems, this.worldModel);
                 for (const derived of derivedItems) {
                     const schemaAtom = this.worldModel.get_atom((derived as any).schema_id);
+                    if (!schemaAtom) {
+                        console.warn(`Could not find schema atom for derived item. Skipping.`);
+                        continue;
+                    }
+
                     const sourceTrust = schemaAtom?.meta.trust_score ?? 0.5;
 
                     const attention = this.modules.attention.calculate_derived(
                         [current_item], // Simplified parent tracking
-                        { atom_id: schemaAtom.id, compiled: null }, // Placeholder
+                        schemaAtom.id,
                         sourceTrust
                     );
 
