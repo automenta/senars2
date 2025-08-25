@@ -1,5 +1,7 @@
 import { HierarchicalNSW } from 'hnswlib-node';
 import stableStringify from 'json-stable-stringify';
+import { isPlainObject } from 'lodash';
+import { JSONPath } from 'jsonpath-plus';
 import {
   SemanticAtom,
   CognitiveItem,
@@ -63,6 +65,7 @@ export interface WorldModel {
 
   query_by_semantic(embedding: number[], k: number): CognitiveItem[];
   query_by_symbolic(pattern: any, k?: number): CognitiveItem[];
+  query_by_structure(pattern: string, k?: number): CognitiveItem[];
 }
 
 // --- WorldModel Implementation with Indexing ---
@@ -77,6 +80,7 @@ export class WorldModelImpl implements WorldModel {
   // Indexes
   private semanticIndex: HierarchicalNSW;
   private symbolicIndex: Map<string, UUID> = new Map(); // content hash -> atom ID
+  private structuralIndex: Map<UUID, any> = new Map(); // atom ID -> structured content
   private atomIdToItemIds: Map<UUID, Set<UUID>> = new Map();
   private hnswLabelToAtomId: Map<number, UUID> = new Map();
   private nextHnswLabel: number = 0;
@@ -113,6 +117,11 @@ export class WorldModelImpl implements WorldModel {
       const label = this.nextHnswLabel++;
       this.hnswLabelToAtomId.set(label, atom.id);
       this.semanticIndex.addPoint(atom.embedding, label);
+    }
+
+    // 3. Add to structural index (if it is a plain object)
+    if (isPlainObject(atom.content)) {
+      this.structuralIndex.set(atom.id, atom.content);
     }
 
     return atom.id;
@@ -207,14 +216,54 @@ export class WorldModelImpl implements WorldModel {
     return results;
   }
 
+  query_by_structure(pattern: string, k?: number): CognitiveItem[] {
+    const matchingAtomIds = new Set<UUID>();
+
+    for (const [atomId, content] of this.structuralIndex.entries()) {
+      try {
+        // Wrap the content in an array to allow root-level filters like $[?(@.type=='animal')]
+        const result = JSONPath({ path: pattern, json: [content] });
+        if (result && result.length > 0) {
+          matchingAtomIds.add(atomId);
+        }
+      } catch (e) {
+        // Ignore errors in JSONPath parsing for now
+        // console.error(`Error applying JSONPath pattern "${pattern}" to atom ${atomId}`, e);
+      }
+    }
+
+    const results: CognitiveItem[] = [];
+    for (const atomId of matchingAtomIds) {
+      const itemIds = this.atomIdToItemIds.get(atomId);
+      if (itemIds) {
+        for (const itemId of itemIds) {
+          if (k && results.length >= k) {
+            break;
+          }
+          const item = this.get_item(itemId);
+          if (item) {
+            results.push(item);
+          }
+        }
+      }
+      if (k && results.length >= k) {
+        break;
+      }
+    }
+
+    return results;
+  }
+
   // --- Higher-level operations ---
 
   find_or_create_atom(content: any, partial_meta: Partial<SemanticAtomMetadata>): SemanticAtom {
     const contentHash = stableStringify(content);
-    const existingAtomId = this.symbolicIndex.get(contentHash);
-    if (existingAtomId) {
+    if (contentHash) {
+      const existingAtomId = this.symbolicIndex.get(contentHash);
+      if (existingAtomId) {
         const atom = this.atoms.get(existingAtomId);
         if (atom) return atom;
+      }
     }
 
     const meta: SemanticAtomMetadata = {

@@ -106,6 +106,64 @@ describe('WorldModelImpl', () => {
       expect(finalTruth?.confidence).toBeCloseTo(0.8);
     });
   });
+
+  describe('Querying', () => {
+    describe('query_by_structure', () => {
+      const atom1Content = { type: 'animal', name: 'cat', features: ['feline', 'small'] };
+      const atom2Content = { type: 'animal', name: 'dog', features: ['canine', 'medium'] };
+      const atom3Content = { type: 'plant', name: 'rose', features: ['flower', 'red'] };
+
+      let atom1: SemanticAtom, atom2: SemanticAtom, atom3: SemanticAtom;
+      let belief1: CognitiveItem, belief2: CognitiveItem, belief3: CognitiveItem;
+
+      beforeEach(() => {
+        atom1 = createAtom(atom1Content);
+        atom2 = createAtom(atom2Content);
+        atom3 = createAtom(atom3Content);
+
+        belief1 = createBelief(atom1.id, { frequency: 1, confidence: 1 });
+        belief2 = createBelief(atom2.id, { frequency: 1, confidence: 1 });
+        belief3 = createBelief(atom3.id, { frequency: 1, confidence: 1 });
+
+        worldModel.add_atom(atom1);
+        worldModel.add_atom(atom2);
+        worldModel.add_atom(atom3);
+        worldModel.add_item(belief1);
+        worldModel.add_item(belief2);
+        worldModel.add_item(belief3);
+      });
+
+      it('should return items matching a specific property value', () => {
+        const results = worldModel.query_by_structure('$[?(@.name=="cat")]');
+        expect(results.length).toBe(1);
+        expect(results[0].id).toBe(belief1.id);
+      });
+
+      it('should return multiple items matching a property', () => {
+        const results = worldModel.query_by_structure('$[?(@.type=="animal")]');
+        expect(results.length).toBe(2);
+        const resultIds = results.map(r => r.id).sort();
+        const expectedIds = [belief1.id, belief2.id].sort();
+        expect(resultIds).toEqual(expectedIds);
+      });
+
+      it('should return items matching a feature in an array', () => {
+        const results = worldModel.query_by_structure('$[?(@.features.includes("canine"))]');
+        expect(results.length).toBe(1);
+        expect(results[0].id).toBe(belief2.id);
+      });
+
+      it('should return an empty array for a non-matching query', () => {
+        const results = worldModel.query_by_structure('$[?(@.name=="lizard")]');
+        expect(results.length).toBe(0);
+      });
+
+      it('should respect the limit parameter "k"', () => {
+        const results = worldModel.query_by_structure('$[?(@.type=="animal")]', 1);
+        expect(results.length).toBe(1);
+      });
+    });
+  });
 });
 
 describe('DefaultBeliefRevisionEngine', () => {
