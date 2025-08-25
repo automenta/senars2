@@ -26,7 +26,9 @@ export interface SchemaMatcher {
 type VariableBindings = { [key: string]: any };
 
 export class SchemaMatcherImpl implements SchemaMatcher {
-    private schemas: AppliableCognitiveSchema[] = [];
+    // A two-level map for efficient schema lookup.
+    // First key: itemA.type, Second key: itemB.type
+    private schemas: Map<CognitiveItemType, Map<CognitiveItemType, AppliableCognitiveSchema[]>> = new Map();
     private world_model: WorldModel;
 
     constructor(world_model: WorldModel) {
@@ -38,14 +40,38 @@ export class SchemaMatcherImpl implements SchemaMatcher {
             throw new Error("Atom is not of type CognitiveSchema");
         }
 
+        const { patternA, patternB } = atom.content;
+        if (!patternA?.type || !patternB?.type) {
+            console.warn(`Schema ${atom.id} is missing pattern types and cannot be indexed.`);
+            return;
+        }
+        const typeA = patternA.type as CognitiveItemType;
+        const typeB = patternB.type as CognitiveItemType;
+
         const compiledSchema = this.compileGenericSchema(atom);
         if (compiledSchema) {
-            this.schemas.push({
+            const appliableSchema: AppliableCognitiveSchema = {
                 atom_id: atom.id,
                 compiled_content: atom.content,
                 apply: compiledSchema,
-            });
-            console.log(`Registered schema: ${atom.id}`);
+            };
+
+            // Get or create the first-level map for typeA
+            let innerMap = this.schemas.get(typeA);
+            if (!innerMap) {
+                innerMap = new Map<CognitiveItemType, AppliableCognitiveSchema[]>();
+                this.schemas.set(typeA, innerMap);
+            }
+
+            // Get or create the schema list for typeB
+            let schemaList = innerMap.get(typeB);
+            if (!schemaList) {
+                schemaList = [];
+                innerMap.set(typeB, schemaList);
+            }
+
+            schemaList.push(appliableSchema);
+            console.log(`Registered schema ${atom.id} for types (${typeA}, ${typeB})`);
         }
     }
 
@@ -56,14 +82,26 @@ export class SchemaMatcherImpl implements SchemaMatcher {
     ): Omit<CognitiveItem, 'id' | 'attention' | 'stamp'>[] {
         const derivedItems: Omit<CognitiveItem, 'id' | 'attention' | 'stamp'>[] = [];
         const itemA_atom = world_model.get_atom(itemA.atom_id);
-
         if (!itemA_atom) return [];
 
+        // Find potentially applicable schemas using the index
+        const potentialSchemasMap = this.schemas.get(itemA.type);
+        if (!potentialSchemasMap) {
+            return [];
+        }
+
         for (const itemB of context) {
+            // Find the specific list of schemas for the (itemA.type, itemB.type) pair
+            const schemaList = potentialSchemasMap.get(itemB.type);
+            if (!schemaList || schemaList.length === 0) {
+                continue; // No schemas for this type combination
+            }
+
             const itemB_atom = world_model.get_atom(itemB.atom_id);
             if (!itemB_atom) continue;
 
-            for (const schema of this.schemas) {
+            for (const schema of schemaList) {
+                // The compiled schema already checks for type and pattern matches.
                 const result = schema.apply(itemA, itemB, itemA_atom, itemB_atom);
                 if (result) {
                     derivedItems.push(result);
