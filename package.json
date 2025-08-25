@@ -4,7 +4,9 @@
   "private": true,
   "description": "A verifiable, goal-directed reasoning system.",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "start-core": "ts-node core/src/main.ts"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

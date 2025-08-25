@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import stableStringify from 'json-stable-stringify';
-import { SemanticAtom, UUID } from './types';
+import { SemanticAtom, SemanticAtomMetadata, UUID } from './types';
 
 /**
  * Creates a deterministic, content-addressable ID for a SemanticAtom.
@@ -56,4 +56,37 @@ export const cosineSimilarity = (vecA: number[], vecB: number[]): number => {
   }
 
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+};
+
+// --- System Schemas ---
+
+export const GOAL_DECOMPOSITION_SCHEMA_CONTENT = {
+  if: {
+    a: { type: 'GOAL', label_pattern: '.* illness' },
+    b: null,
+  },
+  then: {
+    type: 'GOAL',
+    label_template: 'Decomposed goal for {{a.label}}',
+    sub_goals: [
+      { label: 'Verify toxicity', type: 'GOAL' },
+      { label: 'Assess symptoms', type: 'GOAL' },
+    ],
+  },
+};
+
+export const GOAL_DECOMPOSITION_SCHEMA_META: SemanticAtomMetadata = {
+  type: 'CognitiveSchema',
+  source: 'system',
+  author: 'system',
+  trust_score: 1.0,
+  domain: 'metacognition',
+  license: 'MIT',
+};
+
+export const GOAL_DECOMPOSITION_SCHEMA_ATOM: SemanticAtom = {
+  id: createSemanticAtomId(GOAL_DECOMPOSITION_SCHEMA_CONTENT, GOAL_DECOMPOSITION_SCHEMA_META),
+  content: GOAL_DECOMPOSITION_SCHEMA_CONTENT,
+  embedding: [], // Will be filled by embedding service
+  meta: GOAL_DECOMPOSITION_SCHEMA_META,
 };

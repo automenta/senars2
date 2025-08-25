@@ -1,14 +1,14 @@
-import { createSemanticAtomId, SemanticAtom } from './types';
+import { SemanticAtom } from './types';
+import { createSemanticAtomId } from './utils';
 import { WorldModelImpl } from './world-model';
 import { SchemaMatcherImpl } from './modules/schema';
-import { type StructuredTool, type StructuredToolInterface } from '@langchain/core/tools';
 import { z } from 'zod';
 
 // --- Mock Action/Tool Implementation ---
 
-// This is a mock implementation of the LangChain StructuredTool.
+// This is a mock implementation of a tool.
 // It allows us to simulate tool execution within our test environment.
-const webSearchTool: StructuredToolInterface = {
+const webSearchTool = {
   name: 'web_search',
   description: 'Simulates a web search for a given query.',
   schema: z.object({
@@ -26,12 +26,12 @@ const webSearchTool: StructuredToolInterface = {
 // A mock ActionSubsystem that provides our in-memory tool.
 // This avoids the complexity of the real ActionSubsystem for this test.
 export class MockActionSubsystem {
-  private tools: StructuredTool[] = [webSearchTool as StructuredTool];
+  private tools: any[] = [webSearchTool];
 
   public async initialize(): Promise<void> { /* No-op */
   }
 
-  public getTools(): StructuredTool[] {
+  public getTools(): any[] {
     return this.tools;
   }
 

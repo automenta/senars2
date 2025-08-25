@@ -1,5 +1,6 @@
-import { CognitiveItem } from '../types';
+import { CognitiveItem, UUID } from '../types';
 import { WorldModel } from '../world-model';
+import { cosineSimilarity } from '../utils';
 
 export interface ResonanceModule {
   find_context(item: CognitiveItem, world_model: WorldModel, k: number): Promise<CognitiveItem[]>;
@@ -7,53 +8,88 @@ export interface ResonanceModule {
 
 export class ResonanceModuleImpl implements ResonanceModule {
   async find_context(item: CognitiveItem, world_model: WorldModel, k: number): Promise<CognitiveItem[]> {
+    const contextItems: CognitiveItem[] = [];
+
+    // 1. Semantic Search (using item's atom embedding)
     const itemAtom = world_model.get_atom(item.atom_id);
-    if (!itemAtom) {
-      return [];
+    if (itemAtom && itemAtom.embedding && itemAtom.embedding.length > 0) {
+      const semanticResults = world_model.query_by_semantic(itemAtom.embedding, k);
+      contextItems.push(...semanticResults);
     }
 
-    // 1. Perform semantic query
-    const semanticMatches = itemAtom.embedding?.length > 0
-      ? world_model.query_by_semantic(itemAtom.embedding, k)
-      : [];
-
-    // 2. Perform symbolic query
-    const symbolicMatches = world_model.query_by_symbolic(itemAtom.content, k);
-
-    // 3. Combine and deduplicate results
-    const combinedResults = new Map<string, CognitiveItem>();
-
-    for (const match of [...semanticMatches, ...symbolicMatches]) {
-      // Don't include the item itself in its context
-      if (match.id === item.id) {
-        continue;
-      }
-      if (!combinedResults.has(match.id)) {
-        combinedResults.set(match.id, match);
-      }
+    // 2. Symbolic Search (using item's content/label)
+    if (itemAtom && itemAtom.content) {
+      const symbolicResults = world_model.query_by_symbolic(itemAtom.content, k);
+      contextItems.push(...symbolicResults);
     }
 
-    // 4. Score and rank the results (naive scoring for now)
-    // A real implementation would use a more sophisticated scoring function as
-    // described in core.md (semantic similarity, symbolic overlap, goal relevance, etc.)
-    const scoredResults = Array.from(combinedResults.values()).map(match => {
-      let score = 0;
-      // Give higher score to items that appeared in both searches
-      const inSemantic = semanticMatches.some(m => m.id === match.id);
-      const inSymbolic = symbolicMatches.some(m => m.id === match.id);
-      if (inSemantic) score += 0.5;
-      if (inSymbolic) score += 0.5;
+    // 3. Structural Search (if item content is an object)
+    if (itemAtom && typeof itemAtom.content === 'object' && itemAtom.content !== null) {
+      // For now, a simple structural search might look for items with similar top-level keys
+      // A more advanced implementation would use JSONPath patterns derived from the item's structure
+      const structuralResults = world_model.query_by_structure('$..*', k); // Broad search
+      contextItems.push(...structuralResults);
+    }
 
-      // Add base attention priority to score
-      score += match.attention.priority;
+    // 4. Goal relevance search
+    if (item.goal_parent_id) {
+      // Find items related to the same goal
+      const goalRelatedItems = world_model.get_all_items().filter(ci => 
+        ci.goal_parent_id === item.goal_parent_id || ci.id === item.goal_parent_id
+      );
+      contextItems.push(...goalRelatedItems);
+    }
 
-      return { item: match, score };
+    // 5. Recency filter - prioritize recent items
+    const now = Date.now();
+    const recentItems = world_model.get_all_items().filter(ci => 
+      (now - ci.stamp.timestamp) < 3600000 // Items from last hour
+    );
+    contextItems.push(...recentItems);
+
+    // Deduplicate and sort by a combined score
+    const uniqueContextItems = Array.from(new Map(contextItems.map(ci => [ci.id, ci])).values());
+
+    // Scoring includes: Semantic similarity, symbolic overlap, goal relevance, recency, trust
+    uniqueContextItems.sort((a, b) => {
+      // Calculate scores for each item
+      const scoreA = this.calculateContextScore(item, a, world_model);
+      const scoreB = this.calculateContextScore(item, b, world_model);
+      
+      return scoreB - scoreA; // Descending order
     });
 
-    // 5. Return top k results
-    return scoredResults
-      .sort((a, b) => b.score - a.score)
-      .slice(0, k)
-      .map(r => r.item);
+    return uniqueContextItems.slice(0, k);
+  }
+
+  private calculateContextScore(targetItem: CognitiveItem, candidateItem: CognitiveItem, world_model: WorldModel): number {
+    let score = 0;
+    
+    // 1. Attention/Priority boost (0-0.3)
+    score += candidateItem.attention.priority * 0.3;
+    
+    // 2. Recency boost (0-0.2)
+    const timeDiff = Date.now() - candidateItem.stamp.timestamp;
+    const recencyScore = Math.max(0, 1 - (timeDiff / (24 * 60 * 60 * 1000))); // Normalize to 24 hours
+    score += recencyScore * 0.2;
+    
+    // 3. Trust score boost (0-0.2)
+    const atom = world_model.get_atom(candidateItem.atom_id);
+    const trustScore = atom?.meta.trust_score || 0.5;
+    score += trustScore * 0.2;
+    
+    // 4. Goal relevance boost (0-0.2)
+    if (targetItem.goal_parent_id && 
+        (candidateItem.goal_parent_id === targetItem.goal_parent_id || 
+         candidateItem.id === targetItem.goal_parent_id)) {
+      score += 0.2;
+    }
+    
+    // 5. Type compatibility boost (0-0.1)
+    if (targetItem.type === candidateItem.type) {
+      score += 0.1;
+    }
+    
+    return score;
   }
 }

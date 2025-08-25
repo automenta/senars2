@@ -7,41 +7,40 @@ import { ResonanceModuleImpl } from './resonance';
 import { SchemaMatcherImpl } from './schema';
 import { GoalTreeManagerImpl } from './goal-tree';
 import { CognitiveItem, newCognitiveItemId } from '../types';
+import { ReflectionModuleImpl } from './reflection'; // Added import
 
 // Increase timeout for this test suite as it involves starting a subprocess
 jest.setTimeout(30000);
 
 describe('ActionSubsystem and CognitiveCore Integration', () => {
-  let core: CognitiveCore;
   let agenda: AgendaImpl;
   let worldModel: WorldModelImpl;
+  let attentionModule: AttentionModuleImpl; // Declared as let
+  let resonanceModule: ResonanceModuleImpl; // Declared as let
+  let schemaMatcher: SchemaMatcherImpl;     // Declared as let
+  let goalTreeManager: GoalTreeManagerImpl; // Declared as let
   let actionSubsystem: ActionSubsystem;
+  let cognitiveCore: CognitiveCore; // Declared as let
 
   beforeEach(async () => {
     // Setup all the modules
     agenda = new AgendaImpl();
     worldModel = new WorldModelImpl(1); // embedding dim doesn't matter here
-    actionSubsystem = new ActionSubsystem();
+    attentionModule = new AttentionModuleImpl(); // Assigned
+    resonanceModule = new ResonanceModuleImpl(); // Assigned
+    schemaMatcher = new SchemaMatcherImpl(worldModel); // Assigned
+    goalTreeManager = new GoalTreeManagerImpl(worldModel, attentionModule); // Assigned
+    actionSubsystem = new ActionSubsystem(worldModel);
 
-    const modules = {
-      agenda,
-      worldModel,
-      action: actionSubsystem,
-      attention: new AttentionModuleImpl(),
-      resonance: new ResonanceModuleImpl(),
-      matcher: new SchemaMatcherImpl(worldModel),
-      goalTree: new GoalTreeManagerImpl(),
-    };
-
-    core = new CognitiveCore(agenda, worldModel, modules);
+    cognitiveCore = new CognitiveCore(agenda, worldModel);
 
     // Initialize the core, which starts the MCP server
-    await core.initialize();
+    await cognitiveCore.initialize(); // Use cognitiveCore
   });
 
   afterEach(async () => {
     // Ensure the core and its subprocesses are cleaned up
-    await core.stop();
+    await cognitiveCore.stop(); // Use cognitiveCore
   });
 
   it('should execute a tool via a GOAL item and produce a BELIEF item', async () => {
@@ -64,7 +63,7 @@ describe('ActionSubsystem and CognitiveCore Integration', () => {
 
     // 2. Add the goal to the agenda
     agenda.push(goalItem);
-    core.start();
+    cognitiveCore.start(); // Use cognitiveCore
 
     // 3. Wait for the result to appear in the agenda
     // The core will pop the GOAL, execute the tool, and push a BELIEF.

@@ -54,9 +54,9 @@ function parseSExpression(text: string): any {
 
 export class PerceptionModule {
   private worldModel: WorldModel;
-  private attentionModule: AttentionModule;
+  private attentionModule: AttentionModule | null;
 
-  constructor(worldModel: WorldModel, attentionModule: AttentionModule) {
+  constructor(worldModel: WorldModel, attentionModule: AttentionModule | null = null) {
     this.worldModel = worldModel;
     this.attentionModule = attentionModule;
   }
@@ -92,7 +92,7 @@ export class PerceptionModule {
     }
 
     // 3. Find or create a SemanticAtom for the content
-    const meta: Partial<SemanticAtomMetadata> = {
+    const meta: SemanticAtomMetadata = {
       type: 'Fact', // All user input is treated as a Fact for now
       source: 'user_input',
     };
@@ -100,13 +100,20 @@ export class PerceptionModule {
 
     // 4. Create the CognitiveItem
     const partialItem = { type, truth: type === 'BELIEF' ? { frequency: 1.0, confidence: 0.9 } : undefined };
+    
+    // Create a default attention value if attentionModule is not available
+    let attentionValue = { priority: 0.5, durability: 0.5 };
+    if (this.attentionModule) {
+      attentionValue = this.attentionModule.calculate_initial(partialItem as CognitiveItem);
+    }
+
     const item: CognitiveItem = {
       id: newCognitiveItemId(),
       atom_id: atom.id,
       type: type,
       label: `${type}: ${contentStr.trim()}`,
       truth: partialItem.truth,
-      attention: this.attentionModule.calculate_initial(partialItem as CognitiveItem),
+      attention: attentionValue,
       stamp: {
         timestamp: Date.now(),
         parent_ids: [],

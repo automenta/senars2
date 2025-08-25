@@ -1,0 +1,171 @@
+
+import express from 'express';
+import http from 'http';
+import WebSocket from 'ws';
+import { CognitiveCore } from './cognitive-core';
+import { AgendaImpl } from './agenda';
+import { WorldModelImpl } from './world-model';
+import { PerceptionModule } from './perception';
+import { AttentionModuleImpl } from './modules/attention';
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+// Initialize core components
+const agenda = new AgendaImpl();
+const worldModel = new WorldModelImpl(768); // Assuming an embedding dimension of 768
+const attentionModule = new AttentionModuleImpl();
+const perception = new PerceptionModule(worldModel, attentionModule);
+
+const cognitiveCore = new CognitiveCore(agenda, worldModel);
+
+// Initialize the cognitive core
+cognitiveCore.initialize().then(() => {
+  cognitiveCore.start();
+  
+  // Add some initial items for demonstration
+  console.log('Adding initial items for demonstration...');
+  
+  // Example 1: User input leading to a goal
+  const userInput = "My cat seems sick after eating chocolate.";
+  const userInputAtom = worldModel.find_or_create_atom(userInput, {
+    type: 'Observation',
+    source: 'user_input',
+    trust_score: 0.6,
+  });
+
+  const initialGoal = perception.process(`GOAL: Diagnose cat illness`);
+  if (initialGoal) {
+    agenda.push(initialGoal);
+  }
+
+  // Example 2: A simple belief
+  const factBelief = perception.process(`BELIEF: (is_toxic_to chocolate dog)`);
+  if (factBelief) {
+    // Set higher trust for this belief
+    const updatedFactBelief = {
+      ...factBelief,
+      truth: { frequency: 1.0, confidence: 0.95 }
+    };
+    const factAtom = worldModel.get_atom(factBelief.atom_id);
+    if (factAtom) {
+      factAtom.meta.trust_score = 0.95;
+    }
+    agenda.push(updatedFactBelief);
+  }
+  
+  console.log('Initial items added to Agenda.');
+});
+
+// Store connected WebSocket clients
+const clients = new Set<WebSocket>();
+
+// WebSocket connection handling
+wss.on('connection', (ws) => {
+  console.log('Client connected');
+  clients.add(ws);
+  
+  // Send initial state
+  const state = {
+    agenda: agenda.getItems(),
+    worldModel: worldModel.get_all_atoms(),
+    goalTree: (cognitiveCore as any).modules.goalTree.get_goal_tree ? 
+              (cognitiveCore as any).modules.goalTree.get_goal_tree() : {},
+  };
+  
+  ws.send(JSON.stringify(state));
+  
+  ws.on('close', () => {
+    console.log('Client disconnected');
+    clients.delete(ws);
+  });
+  
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+    clients.delete(ws);
+  });
+});
+
+function broadcast(data: any) {
+  const jsonData = JSON.stringify(data);
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(jsonData);
+    }
+  });
+}
+
+// Periodically broadcast the state
+setInterval(() => {
+  const state = {
+    agenda: agenda.getItems(),
+    worldModel: worldModel.get_all_atoms(),
+    goalTree: (cognitiveCore as any).modules.goalTree.get_goal_tree ? 
+              (cognitiveCore as any).modules.goalTree.get_goal_tree() : {},
+  };
+  broadcast(state);
+}, 1000);
+
+// REST API endpoints
+app.use(express.json()); // Enable JSON body parsing
+
+app.get('/api/state', (req, res) => {
+  const state = {
+    agenda: agenda.getItems(),
+    worldModel: worldModel.get_all_atoms(),
+    goalTree: (cognitiveCore as any).modules.goalTree.get_goal_tree ? 
+              (cognitiveCore as any).modules.goalTree.get_goal_tree() : {},
+  };
+  res.json(state);
+});
+
+app.post('/api/input', async (req, res) => {
+  const { data } = req.body;
+  if (!data) {
+    return res.status(400).json({ error: 'Missing data in request body.' });
+  }
+
+  try {
+    const newItem = perception.process(data);
+    if (newItem) {
+      agenda.push(newItem);
+      res.status(200).json({ message: 'Input processed successfully', newItem });
+    } else {
+      res.status(400).json({ error: 'Failed to process input.' });
+    }
+  } catch (error) {
+    console.error('Error processing input:', error);
+    res.status(500).json({ error: 'Failed to process input.' });
+  }
+});
+
+// Add a route to get goal tree information
+app.get('/api/goal-tree', (req, res) => {
+  try {
+    const goalTree = (cognitiveCore as any).modules.goalTree.get_goal_tree ? 
+                     (cognitiveCore as any).modules.goalTree.get_goal_tree() : {};
+    res.json({ goalTree });
+  } catch (error) {
+    console.error('Error getting goal tree:', error);
+    res.status(500).json({ error: 'Failed to get goal tree.' });
+  }
+});
+
+// Add a route to mark a goal as achieved
+app.post('/api/goal/:id/achieve', (req, res) => {
+  try {
+    const goalId = req.params.id;
+    (cognitiveCore as any).modules.goalTree.mark_achieved(goalId);
+    res.status(200).json({ message: `Goal ${goalId} marked as achieved.` });
+  } catch (error) {
+    console.error('Error marking goal as achieved:', error);
+    res.status(500).json({ error: 'Failed to mark goal as achieved.' });
+  }
+});
+
+const port = 3001;
+server.listen(port, () => {
+  console.log(`Server is listening on http://localhost:${port}`);
+  console.log(`WebSocket server is running on ws://localhost:${port}`);
+});

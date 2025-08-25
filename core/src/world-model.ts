@@ -49,26 +49,20 @@ export type CognitiveSchema = {
 
 export interface WorldModel {
   add_atom(atom: SemanticAtom): UUID;
-
   add_item(item: CognitiveItem): void;
-
-  get_atom(id: UUID): SemanticAtom | null;
-
-  get_item(id: UUID): CognitiveItem | null;
-
   update_item(id: UUID, item: CognitiveItem): void;
-
-  find_or_create_atom(content: any, partial_meta: Partial<SemanticAtomMetadata>): SemanticAtom;
+  get_atom(id: UUID): SemanticAtom | null;
+  get_item(id: UUID): CognitiveItem | null;
+  get_all_atoms(): SemanticAtom[];
+  get_all_items(): CognitiveItem[];
 
   query_by_semantic(embedding: number[], k: number): CognitiveItem[];
-
   query_by_symbolic(pattern: any, k?: number): CognitiveItem[];
-
-  query_by_structure(pattern: string, k?: number): CognitiveItem[];
+  query_by_structure(pattern: any, k?: number): CognitiveItem[];
 
   revise_belief(new_item: CognitiveItem): CognitiveItem | null;
-
   register_schema_atom(atom: SemanticAtom): CognitiveSchema | null;
+  find_or_create_atom(content: any, meta: SemanticAtomMetadata): SemanticAtom;
 }
 
 // --- WorldModel Implementation with Indexing ---
@@ -153,13 +147,46 @@ export class WorldModelImpl implements WorldModel {
     return this.items.get(id) ?? null;
   }
 
+  get_all_atoms(): SemanticAtom[] {
+    return Array.from(this.atoms.values());
+  }
+
+  get_all_items(): CognitiveItem[] {
+    return Array.from(this.items.values());
+  }
+
   update_item(id: UUID, item: CognitiveItem): void {
-    if (!this.items.has(id)) {
-      // In a real system, we might throw an error or handle this differently.
-      // For now, we'll log a warning and add it as a new item.
-      console.warn(`Attempted to update non-existent item with ID ${id}. Adding it instead.`);
+    if (this.items.has(id)) {
+      this.items.set(id, item);
     }
-    this.items.set(id, item);
+  }
+
+  find_or_create_atom(content: any, meta: SemanticAtomMetadata): SemanticAtom {
+    // Set timestamp if not provided
+    if (!meta.timestamp) {
+      meta.timestamp = new Date().toISOString();
+    }
+
+    // Create the ID based on content and metadata
+    const id = createSemanticAtomId(content, meta);
+
+    // Check if atom already exists
+    const existingAtom = this.atoms.get(id);
+    if (existingAtom) {
+      return existingAtom;
+    }
+
+    // Create a new atom with a zero embedding (will be updated by embedding service)
+    const atom: SemanticAtom = {
+      id,
+      content,
+      embedding: [], // Will be filled by embedding service
+      meta,
+    };
+
+    // Add the atom to the world model
+    this.add_atom(atom);
+    return atom;
   }
 
   // --- Querying ---
@@ -222,7 +249,7 @@ export class WorldModelImpl implements WorldModel {
     return results;
   }
 
-  query_by_structure(pattern: string, k?: number): CognitiveItem[] {
+  query_by_structure(pattern: any, k?: number): CognitiveItem[] {
     const matchingAtomIds = new Set<UUID>();
 
     for (const [atomId, content] of this.structuralIndex.entries()) {
@@ -261,36 +288,6 @@ export class WorldModelImpl implements WorldModel {
   }
 
   // --- Higher-level operations ---
-
-  find_or_create_atom(content: any, partial_meta: Partial<SemanticAtomMetadata>): SemanticAtom {
-    const contentHash = stableStringify(content);
-    if (contentHash) {
-      const existingAtomId = this.symbolicIndex.get(contentHash);
-      if (existingAtomId) {
-        const atom = this.atoms.get(existingAtomId);
-        if (atom) return atom;
-      }
-    }
-
-    const meta: SemanticAtomMetadata = {
-      type: 'Fact', // Default type
-      ...partial_meta,
-      timestamp: partial_meta.timestamp || new Date().toISOString(),
-    };
-
-    // Embedding would be calculated here by an external service/model
-    const embedding: number[] = []; // Placeholder
-
-    const newAtom: SemanticAtom = {
-      id: createSemanticAtomId(content, meta),
-      content,
-      embedding,
-      meta,
-    };
-
-    this.add_atom(newAtom);
-    return newAtom;
-  }
 
   revise_belief(new_item: CognitiveItem): CognitiveItem | null {
     // This implementation remains the same as before, but it now benefits from
@@ -398,3 +395,4 @@ export class WorldModelImpl implements WorldModel {
     }
   }
 }
+

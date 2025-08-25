@@ -15,6 +15,10 @@ class PriorityQueue<T extends { id: UUID }> {
     return this.heap.length;
   }
 
+  public getItems(): T[] {
+    return [...this.heap];
+  }
+
   public push(item: T): void {
     this.heap.push(item);
     const index = this.heap.length - 1;
@@ -126,17 +130,13 @@ class PriorityQueue<T extends { id: UUID }> {
 }
 
 export interface Agenda {
-  push(item: CognitiveItem): void;
-
-  pop(): Promise<CognitiveItem>;
-
-  peek(): CognitiveItem | null;
-
-  size(): number;
-
-  updateAttention(id: UUID, newVal: AttentionValue): void;
-
-  remove(id: UUID): boolean;
+    push(item: CognitiveItem): void;
+    pop(): Promise<CognitiveItem>;        // Blocking
+    peek(): CognitiveItem | null;
+    size(): number;
+    updateAttention(id: UUID, newVal: AttentionValue): void;
+    remove(id: UUID): boolean;
+    getItems(): CognitiveItem[];
 }
 
 export class AgendaImpl implements Agenda {
@@ -144,18 +144,28 @@ export class AgendaImpl implements Agenda {
   private waitingResolvers: ((item: CognitiveItem) => void)[] = [];
 
   constructor() {
-    this.queue = new PriorityQueue<CognitiveItem>((a, b) => a.attention.priority - b.attention.priority);
+    // Order by attention.priority (descending), so higher priority items are popped first.
+    this.queue = new PriorityQueue<CognitiveItem>((a, b) => b.attention.priority - a.attention.priority);
   }
 
   push(item: CognitiveItem): void {
+    this.queue.push(item);
+    // If there are waiting consumers, resolve the promise with the highest priority item.
+    // The item just pushed might be the new highest priority.
     if (this.waitingResolvers.length > 0) {
       const resolver = this.waitingResolvers.shift();
       if (resolver) {
-        resolver(item);
-        return;
+        // Pop the highest priority item from the queue and resolve the waiting promise.
+        const highestPriorityItem = this.queue.pop();
+        if (highestPriorityItem) {
+          resolver(highestPriorityItem);
+        } else {
+          // This case should ideally not happen if an item was just pushed and resolvers are waiting.
+          // But as a fallback, push the resolver back if no item was found.
+          this.waitingResolvers.unshift(resolver);
+        }
       }
     }
-    this.queue.push(item);
   }
 
   pop(): Promise<CognitiveItem> {
@@ -163,6 +173,7 @@ export class AgendaImpl implements Agenda {
     if (item) {
       return Promise.resolve(item);
     }
+    // If no item is available, add a resolver to the waiting list.
     return new Promise((resolve) => {
       this.waitingResolvers.push(resolve);
     });
@@ -185,5 +196,9 @@ export class AgendaImpl implements Agenda {
 
   remove(id: UUID): boolean {
     return this.queue.remove(id) !== undefined;
+  }
+
+  getItems(): CognitiveItem[] {
+    return this.queue.getItems();
   }
 }
