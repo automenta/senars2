@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "workspaces": [
-    "packages/*"
+    "*"
   ],
   "devDependencies": {
     "@types/node": "^24.3.0",

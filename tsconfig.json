@@ -15,8 +15,8 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@core/*": ["packages/core/src/*"],
-      "@gui/*": ["packages/gui/src/*"]
+      "@core/*": ["core/src/*"],
+      "@gui/*": ["gui/src/*"]
     }
   },
   "exclude": ["node_modules", "dist"]
