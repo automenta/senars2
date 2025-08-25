@@ -90,3 +90,6 @@ export type CognitiveItem = {
   // Optional, human-readable label
   label?: string;
 };
+
+// A partial item used for calculations where a full item is not yet available.
+export type PartialCognitiveItem = Pick<CognitiveItem, 'type' | 'truth' | 'stamp'>;

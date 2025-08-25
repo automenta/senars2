@@ -99,12 +99,23 @@ export class PerceptionModule {
     const atom = this.worldModel.find_or_create_atom(content, meta);
 
     // 4. Create the CognitiveItem
-    const partialItem = { type, truth: type === 'BELIEF' ? { frequency: 1.0, confidence: 0.9 } : undefined };
+    const stamp = {
+      timestamp: Date.now(),
+      parent_ids: [],
+      schema_id: 'user-input' as any, // Special identifier for direct input
+      module: 'user_input', // Explicitly set module for attention calculation
+    };
+
+    const partialItem = {
+      type,
+      truth: type === 'BELIEF' ? { frequency: 1.0, confidence: 0.9 } : undefined,
+      stamp,
+    };
     
     // Create a default attention value if attentionModule is not available
     let attentionValue = { priority: 0.5, durability: 0.5 };
     if (this.attentionModule) {
-      attentionValue = this.attentionModule.calculate_initial(partialItem as CognitiveItem);
+      attentionValue = this.attentionModule.calculate_initial(partialItem);
     }
 
     const item: CognitiveItem = {
@@ -114,11 +125,7 @@ export class PerceptionModule {
       label: `${type}: ${contentStr.trim()}`,
       truth: partialItem.truth,
       attention: attentionValue,
-      stamp: {
-        timestamp: Date.now(),
-        parent_ids: [],
-        schema_id: 'user-input' as any, // Special identifier for direct input
-      },
+      stamp: stamp,
     };
 
     // 5. Add the new item to the world model so it's part of the agent's "memory"

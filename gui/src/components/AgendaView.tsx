@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { CognitiveItem, AppState } from '../types';
+import { CognitiveItem, AppState, GoalTree } from '../types';
 
 function AgendaView() {
   const [agendaItems, setAgendaItems] = useState<CognitiveItem[]>([]);
+  const [goalTree, setGoalTree] = useState<GoalTree>({});
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [inputText, setInputText] = useState('');
   const [goalSuggestions, setGoalSuggestions] = useState<string[]>([]);
@@ -15,8 +16,13 @@ function AgendaView() {
     };
 
     ws.onmessage = (event) => {
-      const data: AppState = JSON.parse(event.data);
-      setAgendaItems(data.agenda);
+      try {
+        const data: AppState = JSON.parse(event.data);
+        setAgendaItems(data.agenda || []);
+        setGoalTree(data.goalTree || {});
+      } catch (error) {
+        console.error("Failed to parse WebSocket message:", error);
+      }
     };
 
     ws.onclose = () => {
@@ -165,32 +171,43 @@ function AgendaView() {
     return Math.min(1, priority).toFixed(2);
   };
 
-  const getSubGoals = (parentId: string) => {
-    return agendaItems.filter(item => item.goal_parent_id === parentId);
-  };
-
-  const renderSubGoals = (parentId: string) => {
-    const subGoals = getSubGoals(parentId);
-    if (subGoals.length === 0) return null;
+  const renderSubGoals = (parentId: string, currentGoalTree: GoalTree) => {
+    const parentNode = currentGoalTree[parentId];
+    if (!parentNode || !parentNode.children || parentNode.children.length === 0) {
+      return null;
+    }
 
     return (
       <div className="sub-goals-container">
-        {subGoals.map(subGoal => (
-          <div key={subGoal.id} className="sub-goal-item">
-            <div className="sub-goal-header">
-              <span className={`status-icon ${getStatusClass(subGoal)}`}>{getStatusIcon(subGoal)}</span>
-              <span className="sub-goal-label">{subGoal.label || `Sub-goal ${subGoal.id.substring(0, 8)}`}</span>
-              <span className="sub-goal-priority">[{subGoal.attention.priority.toFixed(2)}]</span>
-              <span className="sub-goal-trust">[{getTrustInfo(subGoal)}]</span>
-            </div>
-            {expandedItems.has(subGoal.id) && (
-              <div className="sub-goal-details">
-                <p>Blocked by: [Chocolate toxicity confirmed]</p>
-                <p>Will activate when: [Symptoms confirmed] AND [Toxicity verified]</p>
+        {parentNode.children.map(childId => {
+          // The full sub-goal item should be in the agendaItems list
+          const subGoal = agendaItems.find(item => item.id === childId);
+          if (!subGoal) {
+            return (
+              <div key={childId} className="sub-goal-item-missing">
+                Sub-goal {childId.substring(0, 8)} not found in current agenda.
               </div>
-            )}
-          </div>
-        ))}
+            );
+          }
+
+          return (
+            <div key={subGoal.id} className="sub-goal-item">
+              <div className="sub-goal-header" onClick={() => toggleExpand(subGoal.id)}>
+                <span className={`status-icon ${getStatusClass(subGoal)}`}>{getStatusIcon(subGoal)}</span>
+                <span className="sub-goal-label">{subGoal.label || `Sub-goal ${subGoal.id.substring(0, 8)}`}</span>
+                <span className="sub-goal-priority">[{subGoal.attention.priority.toFixed(2)}]</span>
+                <span className="sub-goal-trust">[{getTrustInfo(subGoal)}]</span>
+              </div>
+              {expandedItems.has(subGoal.id) && (
+                <div className="sub-goal-details">
+                  <p>Status: {subGoal.goal_status || 'active'}</p>
+                  {subGoal.goal_status === 'blocked' && <p>Dependencies: [Blocked by other goals]</p>}
+                  {subGoal.goal_status === 'active' && <p>Dependencies: [Waiting for execution]</p>}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -283,7 +300,7 @@ function AgendaView() {
         ) : (
           agendaItems.filter(item => !item.goal_parent_id).map((item) => {
             const isExpanded = expandedItems.has(item.id);
-            const subGoals = getSubGoals(item.id);
+            const children = goalTree[item.id]?.children || [];
             
             return (
               <div key={item.id} className={`agenda-item ${isExpanded ? 'expanded' : ''}`}>
@@ -295,7 +312,7 @@ function AgendaView() {
                     <span className="item-trust">[{getTrustInfo(item)}]</span>
                     <span className="item-time">{formatTimeAgo(item.stamp.timestamp)}</span>
                     {item.goal_status && <span className="item-status">{item.goal_status}</span>}
-                    {subGoals.length > 0 && <span className="sub-goal-count">🔗 {subGoals.length} uses</span>}
+                    {children.length > 0 && <span className="sub-goal-count">🔗 {children.length} sub-goals</span>}
                   </div>
                   <div className="item-actions">
                     <button className="expand-button">{isExpanded ? '▲' : '▼'}</button>
@@ -328,10 +345,10 @@ function AgendaView() {
                       </div>
                     </div>
                     
-                    {subGoals.length > 0 && (
+                    {children.length > 0 && (
                       <div className="sub-goals-section">
                         <h4>Sub-Goals</h4>
-                        {renderSubGoals(item.id)}
+                        {renderSubGoals(item.id, goalTree)}
                       </div>
                     )}
                   </div>

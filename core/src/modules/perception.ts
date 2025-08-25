@@ -41,15 +41,13 @@ export class TextTransducer implements Transducer {
       type: 'BELIEF',
       truth: { frequency: 1.0, confidence: 0.6 },
       attention: this.attentionModule.calculate_initial({
-        id: newCognitiveItemId(), // Temporary ID for attention calculation
-        atom_id: atom.id,
         type: 'BELIEF',
-        label: data.substring(0, 50) + '...',
-        attention: { priority: 0, durability: 0 }, // Placeholder attention
+        truth: { frequency: 1.0, confidence: 0.6 },
         stamp: {
           timestamp: Date.now(),
           parent_ids: [],
           schema_id: 'initial-observation-schema' as UUID,
+          module: 'PerceptionSubsystem',
         },
       }),
       stamp: {

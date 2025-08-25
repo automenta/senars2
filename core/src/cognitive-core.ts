@@ -24,6 +24,9 @@ export class CognitiveCore {
   private agenda: Agenda;
   private worldModel: WorldModel;
   private modules: CognitiveCoreModules;
+  public getModules(): CognitiveCoreModules {
+    return this.modules;
+  }
   private running: boolean = false;
 
   constructor(agenda: Agenda, worldModel: WorldModel) {

@@ -43,15 +43,13 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
         atom_id: verifyToxicityAtom.id,
         type: 'GOAL',
         attention: attentionModule.calculate_initial({
-          id: newCognitiveItemId(), // Temporary ID for attention calculation
-          atom_id: verifyToxicityAtom.id,
           type: 'GOAL',
-          label: 'Verify chocolate toxicity',
-          attention: { priority: 0, durability: 0 }, // Placeholder attention
+          truth: undefined,
           stamp: {
             timestamp: Date.now(),
             parent_ids: [goal.id],
             schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
+            module: 'GoalTreeManager',
           },
         }),
         stamp: {
@@ -77,15 +75,13 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
         atom_id: assessSymptomsAtom.id,
         type: 'GOAL',
         attention: attentionModule.calculate_initial({
-          id: newCognitiveItemId(), // Temporary ID for attention calculation
-          atom_id: assessSymptomsAtom.id,
           type: 'GOAL',
-          label: 'Assess symptoms',
-          attention: { priority: 0, durability: 0 }, // Placeholder attention
+          truth: undefined,
           stamp: {
             timestamp: Date.now(),
             parent_ids: [goal.id],
             schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
+            module: 'GoalTreeManager',
           },
         }),
         stamp: {
@@ -111,15 +107,13 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
         atom_id: recommendTreatmentAtom.id,
         type: 'GOAL',
         attention: attentionModule.calculate_initial({
-          id: newCognitiveItemId(), // Temporary ID for attention calculation
-          atom_id: recommendTreatmentAtom.id,
           type: 'GOAL',
-          label: 'Recommend treatment',
-          attention: { priority: 0, durability: 0 }, // Placeholder attention
+          truth: undefined,
           stamp: {
             timestamp: Date.now(),
             parent_ids: [goal.id],
             schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
+            module: 'GoalTreeManager',
           },
         }),
         stamp: {
@@ -147,15 +141,13 @@ export class GoalTreeManagerImpl implements GoalTreeManager {
         atom_id: queryAtom.id,
         type: 'QUERY',
         attention: attentionModule.calculate_initial({
-          id: newCognitiveItemId(),
-          atom_id: queryAtom.id,
           type: 'QUERY',
-          label: 'Is chocolate toxic to cats?',
-          attention: { priority: 0, durability: 0 },
+          truth: undefined,
           stamp: {
             timestamp: Date.now(),
             parent_ids: [goal.id],
             schema_id: GOAL_DECOMPOSITION_SCHEMA_ATOM.id,
+            module: 'GoalTreeManager',
           },
         }),
         stamp: {

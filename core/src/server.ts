@@ -7,10 +7,23 @@ import { AgendaImpl } from './agenda';
 import { WorldModelImpl } from './world-model';
 import { PerceptionModule } from './perception';
 import { AttentionModuleImpl } from './modules/attention';
+import { CognitiveItem, UUID } from './types';
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+
+// Helper to convert Map to a JSON-serializable object
+function serializeGoalTree(goalTree: Map<UUID, { item: CognitiveItem; children: Set<UUID> }>) {
+  const obj: Record<UUID, { item: CognitiveItem; children: UUID[] }> = {};
+  for (const [key, value] of goalTree.entries()) {
+    obj[key] = {
+      item: value.item,
+      children: Array.from(value.children),
+    };
+  }
+  return obj;
+}
 
 // Initialize core components
 const agenda = new AgendaImpl();
@@ -70,8 +83,7 @@ wss.on('connection', (ws) => {
   const state = {
     agenda: agenda.getItems(),
     worldModel: worldModel.get_all_atoms(),
-    goalTree: (cognitiveCore as any).modules.goalTree.get_goal_tree ? 
-              (cognitiveCore as any).modules.goalTree.get_goal_tree() : {},
+    goalTree: serializeGoalTree(cognitiveCore.getModules().goalTree.get_goal_tree()),
   };
   
   ws.send(JSON.stringify(state));
@@ -101,8 +113,7 @@ setInterval(() => {
   const state = {
     agenda: agenda.getItems(),
     worldModel: worldModel.get_all_atoms(),
-    goalTree: (cognitiveCore as any).modules.goalTree.get_goal_tree ? 
-              (cognitiveCore as any).modules.goalTree.get_goal_tree() : {},
+    goalTree: serializeGoalTree(cognitiveCore.getModules().goalTree.get_goal_tree()),
   };
   broadcast(state);
 }, 1000);
@@ -114,8 +125,7 @@ app.get('/api/state', (req, res) => {
   const state = {
     agenda: agenda.getItems(),
     worldModel: worldModel.get_all_atoms(),
-    goalTree: (cognitiveCore as any).modules.goalTree.get_goal_tree ? 
-              (cognitiveCore as any).modules.goalTree.get_goal_tree() : {},
+    goalTree: serializeGoalTree(cognitiveCore.getModules().goalTree.get_goal_tree()),
   };
   res.json(state);
 });
@@ -143,8 +153,7 @@ app.post('/api/input', async (req, res) => {
 // Add a route to get goal tree information
 app.get('/api/goal-tree', (req, res) => {
   try {
-    const goalTree = (cognitiveCore as any).modules.goalTree.get_goal_tree ? 
-                     (cognitiveCore as any).modules.goalTree.get_goal_tree() : {};
+    const goalTree = serializeGoalTree(cognitiveCore.getModules().goalTree.get_goal_tree());
     res.json({ goalTree });
   } catch (error) {
     console.error('Error getting goal tree:', error);
@@ -155,8 +164,8 @@ app.get('/api/goal-tree', (req, res) => {
 // Add a route to mark a goal as achieved
 app.post('/api/goal/:id/achieve', (req, res) => {
   try {
-    const goalId = req.params.id;
-    (cognitiveCore as any).modules.goalTree.mark_achieved(goalId);
+    const goalId = req.params.id as UUID;
+    cognitiveCore.getModules().goalTree.mark_achieved(goalId);
     res.status(200).json({ message: `Goal ${goalId} marked as achieved.` });
   } catch (error) {
     console.error('Error marking goal as achieved:', error);

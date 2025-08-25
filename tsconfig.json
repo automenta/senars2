@@ -14,8 +14,7 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "composite": true,
-    "noEmit": true,
+    "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
       "@core/*": [
@@ -26,5 +25,5 @@
       ]
     }
   },
-  "exclude": ["node_modules", "dist", "gui"]
+  "exclude": ["node_modules", "gui"]
 }

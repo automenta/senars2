@@ -1,9 +1,9 @@
-import { AttentionValue, CognitiveItem, UUID } from '../types';
+import { AttentionValue, CognitiveItem, PartialCognitiveItem, UUID } from '../types';
 import { WorldModel } from '../world-model';
 import { Agenda } from '../agenda';
 
 export interface AttentionModule {
-  calculate_initial(item: CognitiveItem): AttentionValue;
+  calculate_initial(item: PartialCognitiveItem): AttentionValue;
 
   calculate_derived(
     parents: CognitiveItem[],
@@ -25,7 +25,7 @@ export class AttentionModuleImpl implements AttentionModule {
   private readonly DECAY_FACTOR = 0.01; // How much priority/durability decays per cycle
   private readonly MIN_PRIORITY_THRESHOLD = 0.1; // Items below this priority are removed from agenda
 
-  calculate_initial(item: CognitiveItem): AttentionValue {
+  calculate_initial(item: PartialCognitiveItem): AttentionValue {
     let priority = 0.5;
     let durability = 0.5;
     

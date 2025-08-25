@@ -56,12 +56,14 @@ export class ReflectionModuleImpl implements ReflectionModule {
         atom_id: compactGoalAtom.id,
         type: 'GOAL',
         attention: this.attentionModule.calculate_initial({
-          id: newCognitiveItemId(),
-          atom_id: compactGoalAtom.id,
           type: 'GOAL',
-          label: 'Compact memory',
-          attention: { priority: 0, durability: 0 }, // Placeholder attention
-          stamp: { timestamp: Date.now(), parent_ids: [], schema_id: 'reflection-schema' as UUID },
+          truth: undefined,
+          stamp: {
+            timestamp: Date.now(),
+            parent_ids: [],
+            schema_id: 'reflection-schema' as UUID,
+            module: 'ReflectionModule',
+          },
         }),
         stamp: {
           timestamp: Date.now(),
@@ -89,12 +91,14 @@ export class ReflectionModuleImpl implements ReflectionModule {
         atom_id: auditGoalAtom.id,
         type: 'GOAL',
         attention: this.attentionModule.calculate_initial({
-          id: newCognitiveItemId(),
-          atom_id: auditGoalAtom.id,
           type: 'GOAL',
-          label: 'Run belief audit',
-          attention: { priority: 0, durability: 0 }, // Placeholder attention
-          stamp: { timestamp: Date.now(), parent_ids: [], schema_id: 'reflection-schema' as UUID },
+          truth: undefined,
+          stamp: {
+            timestamp: Date.now(),
+            parent_ids: [],
+            schema_id: 'reflection-schema' as UUID,
+            module: 'ReflectionModule',
+          },
         }),
         stamp: {
           timestamp: Date.now(),
