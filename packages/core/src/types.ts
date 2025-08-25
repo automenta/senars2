@@ -73,10 +73,12 @@ export type DerivationStamp = {
  * Represents a stance toward a SemanticAtom (a belief, goal, or query).
  * It is a mutable wrapper that adds context to an immutable atom.
  */
+export type CognitiveItemType = 'BELIEF' | 'GOAL' | 'QUERY';
+
 export type CognitiveItem = {
     id: UUID;
     atom_id: UUID;               // Reference to a SemanticAtom
-    type: 'BELIEF' | 'GOAL' | 'QUERY';
+    type: CognitiveItemType;
     truth?: TruthValue;          // Only for BELIEF items
     attention: AttentionValue;
     stamp: DerivationStamp;

@@ -57,6 +57,9 @@ export interface WorldModel {
 
   get_atom(id: UUID): SemanticAtom | null;
   get_item(id: UUID): CognitiveItem | null;
+  update_item(id: UUID, item: CognitiveItem): void;
+
+  find_or_create_atom(content: any, partial_meta: Partial<SemanticAtomMetadata>): SemanticAtom;
 
   query_by_semantic(embedding: number[], k: number): CognitiveItem[];
   query_by_symbolic(pattern: any, k?: number): CognitiveItem[];
@@ -75,6 +78,8 @@ export class WorldModelImpl implements WorldModel {
   private semanticIndex: HierarchicalNSW;
   private symbolicIndex: Map<string, UUID> = new Map(); // content hash -> atom ID
   private atomIdToItemIds: Map<UUID, Set<UUID>> = new Map();
+  private hnswLabelToAtomId: Map<number, UUID> = new Map();
+  private nextHnswLabel: number = 0;
 
   // Modules
   private beliefRevisionEngine: BeliefRevisionEngine;
@@ -105,15 +110,9 @@ export class WorldModelImpl implements WorldModel {
 
     // 2. Add to semantic index (if it has an embedding)
     if (atom.embedding && atom.embedding.length > 0) {
-      // The label for HNSW is a number, so we need a mapping.
-      // For simplicity, we'll use the number of items in the index as the label.
-      // A more robust implementation would manage labels explicitly.
-      const label = this.semanticIndex.getCurrentCount();
+      const label = this.nextHnswLabel++;
+      this.hnswLabelToAtomId.set(label, atom.id);
       this.semanticIndex.addPoint(atom.embedding, label);
-      // We need a way to map this label back to our UUID.
-      // Let's assume for now the retrieval gives us enough info or we can map back.
-      // For this implementation, we'll retrieve by label and then lookup the atom.
-      // This is a simplification. A real system might need a label<->UUID map.
     }
 
     return atom.id;
@@ -139,20 +138,31 @@ export class WorldModelImpl implements WorldModel {
     return this.items.get(id) ?? null;
   }
 
+  update_item(id: UUID, item: CognitiveItem): void {
+    if (!this.items.has(id)) {
+        // In a real system, we might throw an error or handle this differently.
+        // For now, we'll log a warning and add it as a new item.
+        console.warn(`Attempted to update non-existent item with ID ${id}. Adding it instead.`);
+    }
+    this.items.set(id, item);
+  }
+
   // --- Querying ---
 
   query_by_semantic(embedding: number[], k: number): CognitiveItem[] {
     const searchResult = this.semanticIndex.searchKnn(embedding, k);
     const neighbors = searchResult.neighbors;
-    const distances = searchResult.distances;
 
-    // This part is tricky because HNSW gives us numeric labels, not UUIDs.
-    // This requires a mapping from the numeric label back to our atom.
-    // For now, this is a placeholder for that logic.
-    // A simple (but not robust) way is to get all atoms and find the ones at those indices.
-    const allAtomsWithEmbeddings = Array.from(this.atoms.values()).filter(a => a.embedding && a.embedding.length > 0);
-
-    const resultAtoms = neighbors.map(label => allAtomsWithEmbeddings[label]).filter(Boolean);
+    const resultAtoms: SemanticAtom[] = [];
+    for (const label of neighbors) {
+        const atomId = this.hnswLabelToAtomId.get(label);
+        if (atomId) {
+            const atom = this.get_atom(atomId);
+            if (atom) {
+                resultAtoms.push(atom);
+            }
+        }
+    }
 
     const resultItems: CognitiveItem[] = [];
     for (const atom of resultAtoms) {
@@ -198,6 +208,34 @@ export class WorldModelImpl implements WorldModel {
   }
 
   // --- Higher-level operations ---
+
+  find_or_create_atom(content: any, partial_meta: Partial<SemanticAtomMetadata>): SemanticAtom {
+    const contentHash = stableStringify(content);
+    const existingAtomId = this.symbolicIndex.get(contentHash);
+    if (existingAtomId) {
+        const atom = this.atoms.get(existingAtomId);
+        if (atom) return atom;
+    }
+
+    const meta: SemanticAtomMetadata = {
+        type: "Fact", // Default type
+        ...partial_meta,
+        timestamp: partial_meta.timestamp || new Date().toISOString(),
+    };
+
+    // Embedding would be calculated here by an external service/model
+    const embedding: number[] = []; // Placeholder
+
+    const newAtom: SemanticAtom = {
+        id: createSemanticAtomId(content, meta),
+        content,
+        embedding,
+        meta,
+    };
+
+    this.add_atom(newAtom);
+    return newAtom;
+  }
 
   revise_belief(new_item: CognitiveItem): CognitiveItem | null {
     // This implementation remains the same as before, but it now benefits from
