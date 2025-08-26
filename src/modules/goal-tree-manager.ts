@@ -5,7 +5,6 @@ export class GoalTreeManager implements IGoalTreeManager {
     decompose(goal: CognitiveItem, world_model: WorldModel): CognitiveItem[] {
         // In a real system, this might look for a "decomposition" schema and apply it.
         // For now, decomposition is handled by the main worker loop finding relevant schemas.
-        console.log(`GoalTreeManager: Decomposing goal ${goal.id} (stub)`);
         return [];
     }
 
@@ -14,7 +13,6 @@ export class GoalTreeManager implements IGoalTreeManager {
         if (!goal || goal.type !== 'GOAL' || goal.goal_status === 'achieved') return;
 
         await world_model.update_item(goal_id, { goal_status: 'achieved' });
-        console.log(`GoalTreeManager: Marked goal ${goal_id} as achieved.`);
 
         const parent_id = goal.goal_parent_id;
         if (!parent_id) return; // No parent to update
@@ -26,7 +24,6 @@ export class GoalTreeManager implements IGoalTreeManager {
         );
 
         if (all_siblings_achieved) {
-            console.log(`GoalTreeManager: All sub-goals of ${parent_id} are achieved. Marking parent as achieved.`);
             await this.mark_achieved(parent_id, world_model);
         }
     }
@@ -36,7 +33,6 @@ export class GoalTreeManager implements IGoalTreeManager {
         if (!goal || goal.type !== 'GOAL' || goal.goal_status === 'failed') return;
 
         await world_model.update_item(goal_id, { goal_status: 'failed' });
-        console.log(`GoalTreeManager: Marked goal ${goal_id} as failed.`);
 
         const parent_id = goal.goal_parent_id;
         if (!parent_id) return;
@@ -44,7 +40,6 @@ export class GoalTreeManager implements IGoalTreeManager {
         const parent_goal = await world_model.get_item(parent_id);
         if (parent_goal && parent_goal.type === 'GOAL') {
             await world_model.update_item(parent_id, { goal_status: 'blocked' });
-            console.log(`GoalTreeManager: Marked parent goal ${parent_id} as blocked due to sub-goal failure.`);
         }
     }
 

@@ -84,17 +84,30 @@ async function main() {
         console.error("❌ No goals found in the World Model.");
     }
 
-    // Semantic search test from previous step
+    // Semantic search test with 384-dim vectors
     console.log("\n--- Semantic Search Test ---");
-    const atom1: SemanticAtom = { id: 'atom1', content: { text: 'cat' }, embedding: [1, 0, 0], meta: { type: 'Fact', source: 'test', timestamp: '', author: '', trust_score: 1, domain: '', license: '' } };
+    const create384DimEmbedding = (v: number[]) => {
+        const embedding = new Array(384).fill(0);
+        embedding[0] = v[0];
+        embedding[1] = v[1];
+        embedding[2] = v[2];
+        return embedding;
+    }
+    const catEmbedding = create384DimEmbedding([1, 0.2, 0.3]);
+    const dogEmbedding = create384DimEmbedding([0.1, 0.9, 0.1]);
+
+    const atom1: SemanticAtom = { id: 'atom1', content: { text: 'cat' }, embedding: catEmbedding, meta: { type: 'Fact', source: 'test', timestamp: '', author: '', trust_score: 1, domain: '', license: '' } };
     const item1: import('./types/data').CognitiveItem = { id: 'item1', atom_id: 'atom1', type: 'BELIEF', attention: { priority: 0.5, durability: 0.5 }, stamp: { timestamp: 0, parent_ids: [], schema_id: '' }, truth: { frequency: 1, confidence: 1 }, label: 'Belief: cat' };
-    const atom2: SemanticAtom = { id: 'atom2', content: { text: 'dog' }, embedding: [0, 1, 0], meta: { type: 'Fact', source: 'test', timestamp: '', author: '', trust_score: 1, domain: '', license: '' } };
+
+    const atom2: SemanticAtom = { id: 'atom2', content: { text: 'dog' }, embedding: dogEmbedding, meta: { type: 'Fact', source: 'test', timestamp: '', author: '', trust_score: 1, domain: '', license: '' } };
     const item2: import('./types/data').CognitiveItem = { id: 'item2', atom_id: 'atom2', type: 'BELIEF', attention: { priority: 0.5, durability: 0.5 }, stamp: { timestamp: 0, parent_ids: [], schema_id: '' }, truth: { frequency: 1, confidence: 1 }, label: 'Belief: dog' };
+
     await worldModel.add_atom(atom1);
     await worldModel.add_item(item1);
     await worldModel.add_atom(atom2);
     await worldModel.add_item(item2);
-    const queryEmbedding = [0.9, 0.1, 0];
+
+    const queryEmbedding = create384DimEmbedding([0.9, 0.1, 0.2]);
     const searchResults = await worldModel.query_by_semantic(queryEmbedding, 1);
     if (searchResults.length > 0 && searchResults[0].id === 'item1') {
         console.log(`✅ Semantic search returned the correct item: ${searchResults[0].label}`);

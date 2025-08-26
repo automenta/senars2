@@ -53,19 +53,22 @@ export class AttentionModule implements IAttentionModule {
 
         // Decay items in the WorldModel
         const allItems = await world_model.getItemsByFilter(_ => true);
-        allItems.forEach(item => {
-            // Priority decays faster than durability
-            item.attention.priority *= DECAY_FACTOR;
-            item.attention.durability *= (DECAY_FACTOR + 0.01); // Durability decays slower
+        const updatePromises: Promise<void>[] = [];
 
-            if (item.attention.priority < 0.01) {
-                item.attention.priority = 0;
-            }
+        allItems.forEach(item => {
+            const newPriority = item.attention.priority * DECAY_FACTOR;
+            const newDurability = item.attention.durability * (DECAY_FACTOR + 0.01);
+
+            const newAttention: AttentionValue = {
+                priority: newPriority < 0.01 ? 0 : newPriority,
+                durability: newDurability,
+            };
+
+            updatePromises.push(world_model.update_item(item.id, { attention: newAttention }));
             decayedItems++;
         });
 
-        // The agenda will be resorted on the next push, so we don't need to do it here.
-        // If the agenda implementation was more complex, we might need to trigger a resort.
+        await Promise.all(updatePromises);
 
         console.log(`AttentionModule: Decayed attention for ${decayedItems} items.`);
     }

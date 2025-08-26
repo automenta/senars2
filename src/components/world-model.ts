@@ -9,7 +9,9 @@ import {
     BeliefRevisionEngine as IBeliefRevisionEngine,
     CognitiveSchema
 } from '../types/interfaces';
-import { cosineSimilarity } from '../lib/utils';
+
+// HNSWLib for semantic search
+import { HierarchicalNSW } from 'hnswlib-node';
 
 // RxDB Imports
 import {
@@ -24,6 +26,8 @@ import { RxDBDevModePlugin } from 'rxdb/plugins/dev-mode';
 import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv';
 
 addRxPlugin(RxDBDevModePlugin);
+
+const EMBEDDING_DIM = 384; // From xenova/transformers all-MiniLM-L6-v2
 
 // --- Schema Definitions ---
 const atomSchema: RxJsonSchema<SemanticAtom> = {
@@ -85,6 +89,11 @@ export class WorldModel implements IWorldModel {
     private items!: RxCollection<CognitiveItem>;
     private beliefRevisionEngine = new BeliefRevisionEngine();
 
+    // Semantic Search Index
+    private semanticIndex!: HierarchicalNSW;
+    private labelToAtomId = new Map<number, UUID>();
+    private nextLabel = 0;
+
     private constructor() {}
 
     public static async create(): Promise<WorldModel> {
@@ -104,6 +113,10 @@ export class WorldModel implements IWorldModel {
         });
         this.atoms = collections.atoms;
         this.items = collections.items;
+
+        // Initialize HNSW index
+        this.semanticIndex = new HierarchicalNSW('cosine', EMBEDDING_DIM);
+        this.semanticIndex.initIndex(10000); // Max elements
     }
 
     public async destroy() {
@@ -112,6 +125,11 @@ export class WorldModel implements IWorldModel {
 
     async add_atom(atom: SemanticAtom): Promise<UUID> {
         await this.atoms.insert(atom);
+        if (atom.embedding && atom.embedding.length === EMBEDDING_DIM) {
+            const label = this.nextLabel++;
+            this.labelToAtomId.set(label, atom.id);
+            this.semanticIndex.addPoint(atom.embedding, label);
+        }
         return atom.id;
     }
 
@@ -145,18 +163,21 @@ export class WorldModel implements IWorldModel {
     }
 
     async query_by_semantic(embedding: number[], k: number): Promise<CognitiveItem[]> {
-        const allItems = await this.items.find().exec();
-        const scoredItems = [];
-        for (const itemDoc of allItems) {
-            const item = itemDoc.toMutableJSON();
-            const atom = await this.get_atom(item.atom_id);
-            if (atom && atom.embedding && atom.embedding.length > 0) {
-                const score = cosineSimilarity(embedding, atom.embedding);
-                scoredItems.push({ item, score });
-            }
+        if (this.semanticIndex.getCurrentCount() === 0) {
+            return [];
         }
-        scoredItems.sort((a, b) => b.score - a.score);
-        return scoredItems.slice(0, k).map(si => si.item);
+
+        const result = this.semanticIndex.searchKnn(embedding, k);
+        const atomIds = result.neighbors.map(label => this.labelToAtomId.get(label)).filter(id => id) as UUID[];
+
+        if (atomIds.length === 0) {
+            return [];
+        }
+
+        const items = await this.query_by_symbolic({ atom_id: { $in: atomIds } });
+
+        // Optional: Re-rank based on distance, though HNSW order is generally good
+        return items;
     }
 
     async revise_belief(new_item: CognitiveItem): Promise<CognitiveItem | null> {

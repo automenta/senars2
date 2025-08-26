@@ -40,8 +40,6 @@ export class CognitiveWorker {
     }
 
     private async process_item(itemA: CognitiveItem): Promise<void> {
-        console.log(`Processing item: ${itemA.label ?? itemA.id} (${itemA.type}, P:${itemA.attention.priority.toFixed(2)})`);
-
         // 1. Contextualize & Reason
         const contextItems = await this.resonanceModule.find_context(itemA, this.worldModel, 10);
         for (const itemB of [...contextItems, itemA]) {
@@ -56,7 +54,6 @@ export class CognitiveWorker {
                 for (const newItem of derivedData.items) {
                     await this.worldModel.add_item(newItem);
                     this.agenda.push(newItem);
-                    console.log(`Derived new item: ${newItem.label ?? newItem.id} (${newItem.type}) and added to WorldModel.`);
                 }
             }
         }
@@ -67,7 +64,6 @@ export class CognitiveWorker {
             if (belief_from_action) {
                 await this.worldModel.add_item(belief_from_action);
                 this.agenda.push(belief_from_action);
-                console.log(`Pushed belief from action to agenda: ${belief_from_action.label ?? belief_from_action.id}`);
             }
         }
 

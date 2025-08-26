@@ -49,8 +49,7 @@ export class ActionSubsystem {
         } catch (error) {
             console.error(`ActionSubsystem: Executor ${executor.constructor.name} failed for goal ${goal.label ?? goal.id}`, error);
             // Mark the goal as failed
-            // TODO: This mutation is on a copy. Use a WorldModel.update() method to persist.
-            goal.goal_status = 'failed';
+            await this.worldModel.update_item(goal.id, { goal_status: 'failed' });
             return null;
         }
     }

@@ -1,36 +1,5 @@
+--- SCRIPT STARTED ---
 --- System Initialization ---
-ActionSubsystem: Registered executor: LogExecutor
-PerceptionSubsystem: Registered transducer: TextTransducer
-Reflection loop started. Running every 0.2s.
-
---- Scenario Setup ---
-Successfully registered schema: test-schema-atom (Test Trigger Schema)
-Schema registered. System is ready for controlled execution.
-
---- Running Scenario (Tick-based) ---
-PerceptionSubsystem: Data from 'user_input' processed by TextTransducer.
-PerceptionSubsystem: Pushed new item to agenda: Observation: "initiate test..."
-
-[Tick 1] - Agenda size: 1
-Processing item: Observation: "initiate test..." (BELIEF, P:0.90)
-Derived new item: Goal: Log system test message (GOAL) and added to WorldModel.
-
-[Tick 2] - Agenda size: 1
-Processing item: Goal: Log system test message (GOAL, P:0.90)
-ActionSubsystem: Executing goal Goal: Log system test message with LogExecutor
-[LogExecutor] System test successful
-ActionSubsystem: Goal Goal: Log system test message executed successfully.
-Pushed belief from action to agenda: Result of logging: "System test successf..."
-GoalTreeManager: Marked goal d3f2a5a5-2c05-4b01-a00e-16d8345c4a92 as achieved.
-
-[Tick 3] - Agenda size: 1
-Processing item: Result of logging: "System test successf..." (BELIEF, P:0.80)
-Reflection loop stopped.
-
---- Scenario Complete ---
-Final state of Agenda size: 0
 
 --- Verification ---
-✅ Goal was created: Goal: Log system test message
-Goal status: achieved
-✅ Goal was successfully achieved.
+Test with WorldModel commented out.
