@@ -1,0 +1,160 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import './App.css';
+
+type Goal = {
+  id: string;
+  label: string;
+  status: string;
+};
+
+type ConnectionStatusType = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+const ConnectionStatus: React.FC<{ status: ConnectionStatusType }> = ({ status }) => {
+  return (
+    <div className={`connection-status ${status}`}>
+      Status: {status}
+    </div>
+  );
+};
+
+function App() {
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [newGoal, setNewGoal] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('disconnected');
+  const ws = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    setConnectionStatus('connecting');
+    const websocket = new WebSocket('ws://localhost:8080');
+    ws.current = websocket;
+
+    websocket.onopen = () => {
+      console.log('WebSocket connected');
+      setConnectionStatus('connected');
+      const requestId = uuidv4();
+      const message = {
+        request_type: 'GET_ALL_GOALS',
+        requestId: requestId,
+      };
+      websocket.send(JSON.stringify(message));
+    };
+
+    websocket.onmessage = (event) => {
+      console.log('WebSocket message received:', event.data);
+      const message = JSON.parse(event.data);
+
+      // Handle direct responses from requests
+      if (message.status === 'success') {
+        if (Array.isArray(message.goals)) {
+          // Response to GET_ALL_GOALS
+          setGoals(message.goals);
+        } else if (message.goalId) {
+          // Response to CREATE_GOAL
+          console.log(`Goal creation acknowledged for goalId: ${message.goalId}`);
+        }
+        return;
+      }
+
+      // Handle broadcasted events
+      switch (message.type) {
+        case 'item_added':
+          if (message.data && message.data.type === 'GOAL' && message.data.label) {
+            setGoals(prevGoals => {
+              // Avoid duplicates
+              if (prevGoals.find(g => g.id === message.data.id)) {
+                return prevGoals;
+              }
+              const newGoal: Goal = {
+                id: message.data.id,
+                label: message.data.label,
+                status: message.data.goal_status,
+              };
+              return [...prevGoals, newGoal];
+            });
+          }
+          break;
+        case 'item_updated':
+          if (message.data && message.data.type === 'GOAL') {
+            setGoals(prevGoals =>
+              prevGoals.map(g =>
+                g.id === message.data.id
+                  ? { ...g, status: message.data.goal_status }
+                  : g
+              )
+            );
+          }
+          break;
+        default:
+          // console.log('Unhandled message type:', message.type);
+          break;
+      }
+    };
+
+    websocket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setConnectionStatus('error');
+    };
+
+    websocket.onclose = () => {
+      console.log('WebSocket disconnected');
+      setConnectionStatus('disconnected');
+    };
+
+    return () => {
+      websocket.close();
+    };
+  }, []);
+
+  const handleAddGoal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGoal.trim() || !ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const requestId = uuidv4();
+    const message = {
+      request_type: 'CREATE_GOAL',
+      requestId: requestId,
+      payload: {
+        text: newGoal,
+      },
+    };
+
+    ws.current.send(JSON.stringify(message));
+    setNewGoal('');
+  };
+
+  return (
+    <div className="App">
+      <header className="App-header">
+        <h1>Cognitive Agent TODO List</h1>
+        <ConnectionStatus status={connectionStatus} />
+      </header>
+      <main>
+        <div className="goal-list">
+          <h2>Goals</h2>
+          <ul>
+            {goals.map(goal => (
+              <li key={goal.id} className={`goal-item status-${goal.status}`}>
+                <span className="goal-label">{goal.label}</span>
+                <span className="goal-status">{goal.status}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <form className="add-goal-form" onSubmit={handleAddGoal}>
+          <input
+            type="text"
+            value={newGoal}
+            onChange={(e) => setNewGoal(e.target.value)}
+            placeholder="Enter a new goal"
+          />
+          <button type="submit">Add Goal</button>
+        </form>
+      </main>
+    </div>
+  );
+}
+
+export default App;

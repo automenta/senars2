@@ -26,7 +26,7 @@ export const ovenSafetySchemaAtom: SemanticAtom = {
 
 export const ovenSafetySchema: CognitiveSchema = {
     atom_id: ovenSafetySchemaAtom.id,
-    apply: (a: CognitiveItem, b: CognitiveItem, wm: WorldModel): SchemaDerivedData => {
+    apply: async (a: CognitiveItem, b: CognitiveItem, wm: WorldModel): Promise<SchemaDerivedData> => {
 
         const goal_content = { command: 'log', message: 'Action: Turn off the oven.' };
         const goal_meta = {
