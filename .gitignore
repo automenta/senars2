@@ -1,3 +1,8 @@
 node_modules/
 dist/
 .DS_Store
+
+# Test and coverage reports
+coverage/
+test-results.json
+junit.xml
