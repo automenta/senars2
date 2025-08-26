@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import './App.css';
+import EventLog from './EventLog';
 
 type Goal = {
   id: string;
@@ -8,23 +9,42 @@ type Goal = {
   status: string;
 };
 
-type ConnectionStatusType = 'connecting' | 'connected' | 'disconnected' | 'error';
+type Event = {
+  timestamp: string;
+  data: string;
+};
+
+type ConnectionStatusType = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
 
 const ConnectionStatus: React.FC<{ status: ConnectionStatusType }> = ({ status }) => {
+  const statusMessages = {
+    connecting: 'Connecting to agent...',
+    connected: 'Connected',
+    reconnecting: 'Connection lost. Reconnecting...',
+    disconnected: 'Disconnected',
+    error: 'Connection error',
+  };
   return (
     <div className={`connection-status ${status}`}>
-      Status: {status}
+      Status: {statusMessages[status]}
     </div>
   );
 };
 
 function App() {
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [newGoal, setNewGoal] = useState('');
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('disconnected');
   const ws = useRef<WebSocket | null>(null);
+  const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
+  const connect = () => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      console.log("WebSocket is already connected.");
+      return;
+    }
+
     setConnectionStatus('connecting');
     const websocket = new WebSocket('ws://localhost:8080');
     ws.current = websocket;
@@ -32,6 +52,10 @@ function App() {
     websocket.onopen = () => {
       console.log('WebSocket connected');
       setConnectionStatus('connected');
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current);
+        reconnectTimer.current = null;
+      }
       const requestId = uuidv4();
       const message = {
         request_type: 'GET_ALL_GOALS',
@@ -41,16 +65,20 @@ function App() {
     };
 
     websocket.onmessage = (event) => {
+      const newEvent: Event = {
+        timestamp: new Date().toLocaleTimeString(),
+        data: event.data,
+      };
+      setEvents(prevEvents => [...prevEvents, newEvent]);
+
       console.log('WebSocket message received:', event.data);
       const message = JSON.parse(event.data);
 
       // Handle direct responses from requests
       if (message.status === 'success') {
         if (Array.isArray(message.goals)) {
-          // Response to GET_ALL_GOALS
           setGoals(message.goals);
         } else if (message.goalId) {
-          // Response to CREATE_GOAL
           console.log(`Goal creation acknowledged for goalId: ${message.goalId}`);
         }
         return;
@@ -61,15 +89,10 @@ function App() {
         case 'item_added':
           if (message.data && message.data.type === 'GOAL' && message.data.label) {
             setGoals(prevGoals => {
-              // Avoid duplicates
               if (prevGoals.find(g => g.id === message.data.id)) {
                 return prevGoals;
               }
-              const newGoal: Goal = {
-                id: message.data.id,
-                label: message.data.label,
-                status: message.data.goal_status,
-              };
+              const newGoal: Goal = { id: message.data.id, label: message.data.label, status: message.data.goal_status };
               return [...prevGoals, newGoal];
             });
           }
@@ -78,15 +101,12 @@ function App() {
           if (message.data && message.data.type === 'GOAL') {
             setGoals(prevGoals =>
               prevGoals.map(g =>
-                g.id === message.data.id
-                  ? { ...g, status: message.data.goal_status }
-                  : g
+                g.id === message.data.id ? { ...g, status: message.data.goal_status } : g
               )
             );
           }
           break;
         default:
-          // console.log('Unhandled message type:', message.type);
           break;
       }
     };
@@ -98,11 +118,28 @@ function App() {
 
     websocket.onclose = () => {
       console.log('WebSocket disconnected');
-      setConnectionStatus('disconnected');
+      if (reconnectTimer.current) {
+        // Avoid setting multiple timers
+        return;
+      }
+      setConnectionStatus('reconnecting');
+      reconnectTimer.current = setTimeout(() => {
+        console.log('Attempting to reconnect...');
+        connect();
+      }, 3000);
     };
+  };
+
+  useEffect(() => {
+    connect();
 
     return () => {
-      websocket.close();
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current);
+      }
+      if (ws.current) {
+        ws.current.close();
+      }
     };
   }, []);
 
@@ -152,6 +189,7 @@ function App() {
           />
           <button type="submit">Add Goal</button>
         </form>
+        <EventLog events={events} />
       </main>
     </div>
   );
