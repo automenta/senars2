@@ -1,0 +1,52 @@
+[
+  {
+    "id": "f0f8f8f8-f8f8-4f8f-8f8f-f8f8f8f8f8f8",
+    "atom_id": "a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0",
+    "type": "GOAL",
+    "attention": {
+      "priority": 0.8,
+      "durability": 0.9
+    },
+    "stamp": {
+      "timestamp": 1729965510000,
+      "parent_ids": [],
+      "schema_id": "manual/requirement-creation"
+    },
+    "goal_status": "active",
+    "meta": {
+      "type": "dev/requirement",
+      "description": "The system shall be able to analyze its own test failures.",
+      "acceptanceCriteria": [
+        "When a test fails, a TestFailure artifact is created.",
+        "The TestFailure artifact includes the test name and error message.",
+        "The system can correlate the failure with code coverage data."
+      ],
+      "timestamp": "2025-08-26T15:18:30.000Z"
+    }
+  },
+  {
+    "id": "f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1",
+    "atom_id": "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1",
+    "type": "GOAL",
+    "attention": {
+      "priority": 0.7,
+      "durability": 0.8
+    },
+    "stamp": {
+      "timestamp": 1729965510000,
+      "parent_ids": [],
+      "schema_id": "manual/requirement-creation"
+    },
+    "goal_status": "active",
+    "meta": {
+      "type": "dev/requirement",
+      "description": "The system shall maintain a list of functionality requirements.",
+      "acceptanceCriteria": [
+        "Requirements are stored in a machine-readable format (JSON).",
+        "Requirements can be loaded and parsed by a script.",
+        "Each requirement has a description and acceptance criteria."
+      ],
+      "timestamp": "2025-08-26T15:18:30.000Z"
+    }
+  }
+]

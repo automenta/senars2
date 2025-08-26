@@ -1,0 +1,4 @@
+{"total": {"lines":{"total":107,"covered":88,"skipped":0,"pct":82.24},"statements":{"total":113,"covered":92,"skipped":0,"pct":81.41},"functions":{"total":34,"covered":28,"skipped":0,"pct":82.35},"branches":{"total":48,"covered":31,"skipped":0,"pct":64.58},"branchesTrue":{"total":0,"covered":0,"skipped":0,"pct":100}}
+,"/app/src/components/agenda.ts": {"lines":{"total":32,"covered":29,"skipped":0,"pct":90.62},"functions":{"total":11,"covered":9,"skipped":0,"pct":81.81},"statements":{"total":32,"covered":29,"skipped":0,"pct":90.62},"branches":{"total":16,"covered":12,"skipped":0,"pct":75}}
+,"/app/src/lib/priority-queue.ts": {"lines":{"total":75,"covered":59,"skipped":0,"pct":78.66},"functions":{"total":23,"covered":19,"skipped":0,"pct":82.6},"statements":{"total":81,"covered":63,"skipped":0,"pct":77.77},"branches":{"total":32,"covered":19,"skipped":0,"pct":59.37}}
+}
