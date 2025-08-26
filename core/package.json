@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
     "build": "../../node_modules/.bin/tsc",
     "start": "ts-node src/server.ts"
   },
@@ -30,6 +30,7 @@
     "@types/json-stable-stringify": "^1.1.0",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.18.1",
+    "cross-env": "^10.0.0",
     "jest": "^30.0.5",
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",

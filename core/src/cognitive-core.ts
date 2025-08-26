@@ -42,9 +42,9 @@ export class CognitiveCore {
     const schemaMatcher = new SchemaMatcherImpl(worldModel);
     const predictionModule = new PredictiveModelingModuleImpl();
     const goalTreeManager = new GoalTreeManagerImpl(worldModel, attentionModule, schemaMatcher, predictionModule);
-    const actionSubsystem = new ActionSubsystem(worldModel); // Pass worldModel to ActionSubsystem
-    const reflectionModule = new ReflectionModuleImpl(agenda, worldModel, attentionModule, 60000);
     const perceptionSubsystem = new PerceptionSubsystem(worldModel, attentionModule);
+    const actionSubsystem = new ActionSubsystem(worldModel, perceptionSubsystem);
+    const reflectionModule = new ReflectionModuleImpl(agenda, worldModel, attentionModule, 60000);
     const goalCompositionModule = new GoalCompositionModule(worldModel);
 
     this.modules = {

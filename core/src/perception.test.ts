@@ -89,4 +89,39 @@ describe('PerceptionSubsystem', () => {
       })
     );
   });
+
+  describe('perceiveFile (CodebaseTransducer)', () => {
+    it('should correctly process a file input into a BELIEF item', async () => {
+      const filePath = '/app/src/main.ts';
+      const fileContent = 'console.log("hello world");';
+
+      const items = await perception.perceiveFile(filePath, fileContent);
+
+      expect(items).toHaveLength(1);
+      const item = items[0];
+
+      expect(item.type).toBe('BELIEF');
+      expect(item.label).toBe(`File: ${filePath}`);
+      expect(item.truth?.confidence).toBe(1.0);
+
+      // Check that the atom was created with the correct metadata
+      expect(mockWorldModel.find_or_create_atom).toHaveBeenCalledWith(
+        fileContent,
+        expect.objectContaining({
+          type: 'Code',
+          source: 'file_system',
+          path: filePath,
+          trust_score: 1.0
+        })
+      );
+
+      // Check that the initial attention was calculated for the new item
+      expect(mockAttentionModule.calculate_initial).toHaveBeenCalledWith(
+        expect.objectContaining({
+          label: `File: ${filePath}`,
+          type: 'BELIEF'
+        })
+      );
+    });
+  });
 });

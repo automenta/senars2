@@ -206,20 +206,50 @@ export class SchemaMatcherImpl implements SchemaMatcher {
 
   private matchPattern(pattern: string, value: any, initialBindings: Record<string, any> = {}): Record<string, any> | null {
     if (typeof value !== 'string' || typeof pattern !== 'string') return null;
-    const patternTokens = pattern.split(/\s+/);
-    const valueTokens = value.split(/\s+/);
-    if (patternTokens.length !== valueTokens.length) return null;
-    const bindings = { ...initialBindings };
-    for (let i = 0; i < patternTokens.length; i++) {
-      const pToken = patternTokens[i];
-      const vToken = valueTokens[i];
-      if (pToken.startsWith('?')) {
-        if (bindings[pToken] && bindings[pToken] !== vToken) return null;
-        bindings[pToken] = vToken;
-      } else if (pToken !== vToken) {
-        return null;
-      }
+
+    // Handle simple case: no variables, just exact match.
+    if (!pattern.includes('?')) {
+      return pattern === value ? initialBindings : null;
     }
+
+    // Handle variable case with regex
+    const variableNames: string[] = [];
+    const parts = pattern.split(/(\?\w+)/g).filter(p => p); // Split by variables, keep them, remove empty strings
+
+    let regexString = '^';
+    parts.forEach((part, index) => {
+      if (part.startsWith('?')) {
+        const varName = part.substring(1);
+        variableNames.push(part);
+        // If it's the last part, be greedy. Otherwise, be non-greedy.
+        if (index === parts.length - 1) {
+          regexString += `(?<${varName}>.+)`;
+        } else {
+          regexString += `(?<${varName}>.+?)`;
+        }
+      } else {
+        // Escape special regex characters in the literal part
+        const escapedPart = part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        regexString += escapedPart;
+      }
+    });
+    regexString += '$';
+
+    const regex = new RegExp(regexString);
+    const match = value.match(regex);
+
+    if (!match || !match.groups) return null;
+
+    const bindings = { ...initialBindings };
+    for (const varName of variableNames) {
+        const groupName = varName.substring(1);
+        const matchedValue = match.groups[groupName];
+        if (bindings[varName] && bindings[varName] !== matchedValue) {
+            return null; // Conflict with existing binding
+        }
+        bindings[varName] = matchedValue;
+    }
+
     return bindings;
   }
 

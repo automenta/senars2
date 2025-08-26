@@ -104,6 +104,71 @@ export class TextTransducer implements Transducer {
   }
 }
 
+// --- New Transducer for Codebase Files ---
+
+export type CodebaseFileInput = {
+  type: 'codebase_file';
+  path: string;
+  content: string;
+};
+
+export class CodebaseTransducer implements Transducer {
+  private worldModel: WorldModel;
+  private attentionModule: AttentionModule;
+
+  constructor(worldModel: WorldModel, attentionModule: AttentionModule) {
+    this.worldModel = worldModel;
+    this.attentionModule = attentionModule;
+  }
+
+  can_process(data: any): boolean {
+    return data && data.type === 'codebase_file' && typeof data.path === 'string' && typeof data.content === 'string';
+  }
+
+  async process(data: CodebaseFileInput): Promise<CognitiveItem[]> {
+    const { path, content } = data;
+
+    const finalMeta: SemanticAtomMetadata = {
+      type: 'Code',
+      source: 'file_system',
+      timestamp: new Date().toISOString(),
+      trust_score: 1.0, // We trust our own files
+      domain: 'software_development',
+      path: path, // Add file path to metadata
+    };
+
+    const atom = this.worldModel.find_or_create_atom(content, finalMeta);
+
+    const label = `File: ${path}`;
+
+    const partialItem: PartialCognitiveItem = {
+      atom_id: atom.id,
+      type: 'BELIEF',
+      truth: { frequency: 1.0, confidence: 1.0 }, // The belief that the file exists and has this content is certain
+      stamp: {
+        timestamp: Date.now(),
+        parent_ids: [],
+        schema_id: 'codebase-transducer-schema' as UUID,
+        module: 'Perception',
+      },
+      label,
+    };
+
+    const newItem: CognitiveItem = {
+      id: newCognitiveItemId(),
+      atom_id: atom.id,
+      type: 'BELIEF',
+      truth: partialItem.truth,
+      attention: this.attentionModule.calculate_initial(partialItem),
+      stamp: partialItem.stamp,
+      label: partialItem.label,
+    };
+
+    return [newItem];
+  }
+}
+
+
 export class PerceptionSubsystem {
   private transducers: Transducer[] = [];
   private worldModel: WorldModel;
@@ -113,7 +178,7 @@ export class PerceptionSubsystem {
     this.worldModel = worldModel;
     this.attentionModule = attentionModule;
     this.registerTransducer(new TextTransducer(this.worldModel, this.attentionModule));
-    // Register other transducers here (e.g., SensorStreamTransducer)
+    this.registerTransducer(new CodebaseTransducer(this.worldModel, this.attentionModule));
   }
 
   public registerTransducer(transducer: Transducer): void {
@@ -128,5 +193,14 @@ export class PerceptionSubsystem {
     }
     console.warn('No transducer found for input data:', data);
     return [];
+  }
+
+  public async perceiveFile(filePath: string, fileContent: string): Promise<CognitiveItem[]> {
+    const fileInput: CodebaseFileInput = {
+      type: 'codebase_file',
+      path: filePath,
+      content: fileContent,
+    };
+    return this.process(fileInput);
   }
 }

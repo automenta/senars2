@@ -1,5 +1,6 @@
 import { SchemaMatcherImpl } from './schema.js';
 import { WorldModelImpl } from '../world-model.js';
+import { READ_FILE_SCHEMA_ATOM, SCAN_CODEBASE_SCHEMA_ATOM } from '../system-schemas.js';
 import { CognitiveItem, newCognitiveItemId, SemanticAtom, UUID } from '../types.js';
 import { createSemanticAtomId } from '../utils.js';
 
@@ -108,5 +109,27 @@ describe('SchemaMatcherImpl', () => {
       const derivedItems = schemaMatcher.find_and_apply_schemas(goalItem, [anotherGoalItem], worldModel);
 
       expect(derivedItems).toHaveLength(0);
+    });
+
+    describe('Software Development Schemas', () => {
+        it('should decompose the "scan codebase" goal into sub-queries', () => {
+          // Register the software development schemas
+          schemaMatcher.register_schema(SCAN_CODEBASE_SCHEMA_ATOM);
+          schemaMatcher.register_schema(READ_FILE_SCHEMA_ATOM);
+
+          // Create the high-level goal
+          const scanGoalAtom = worldModel.find_or_create_atom('scan codebase', { type: 'Goal' });
+          const scanGoalItem = createItem(scanGoalAtom, 'GOAL', 'scan codebase');
+
+          // Find and apply decomposition schemas
+          const results = schemaMatcher.find_and_apply_decomposition_schemas(scanGoalItem, worldModel);
+
+          // Assert that the goal was decomposed into the correct sub-queries
+          expect(results).toHaveLength(3);
+          expect(results[0].partialItem.type).toBe('QUERY');
+          expect(results[0].partialItem.label).toBe('content of file package.json');
+          expect(results[1].partialItem.label).toBe('content of file core/src/cognitive-core.ts');
+          expect(results[2].partialItem.label).toBe('content of file gui/src/components/AgendaView.tsx');
+        });
     });
 });
