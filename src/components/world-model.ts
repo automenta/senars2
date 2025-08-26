@@ -26,7 +26,9 @@ import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
 import { RxDBDevModePlugin } from 'rxdb/plugins/dev-mode';
 import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv';
 
-addRxPlugin(RxDBDevModePlugin);
+if (process.env.NODE_ENV === 'development') {
+    addRxPlugin(RxDBDevModePlugin);
+}
 
 const EMBEDDING_DIM = 384; // From xenova/transformers all-MiniLM-L6-v2
 

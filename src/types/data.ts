@@ -35,6 +35,8 @@ export type DerivationStamp = {
     module?: string;
 }
 
+export type GoalStatus = "active" | "blocked" | "achieved" | "failed";
+
 export type CognitiveItem = {
     id: UUID;
     atom_id: UUID;
@@ -44,7 +46,7 @@ export type CognitiveItem = {
     stamp: DerivationStamp;
 
     goal_parent_id?: UUID;
-    goal_status?: "active" | "blocked" | "achieved" | "failed";
+    goal_status?: GoalStatus;
 
     label?: string;
 }
