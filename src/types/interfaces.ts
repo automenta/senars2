@@ -63,7 +63,7 @@ export interface ResonanceModule {
 }
 
 export interface SchemaMatcher {
-    register_schema(schema: CognitiveSchema, world_model: WorldModel): CognitiveSchema;
+    register_schema(schema: CognitiveSchema, world_model: WorldModel): Promise<CognitiveSchema>;
     find_applicable(a: CognitiveItem, b: CognitiveItem, world_model: WorldModel): Promise<CognitiveSchema[]>;
 }
 

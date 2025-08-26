@@ -1,5 +1,62 @@
---- SCRIPT STARTED ---
+-------------- RxDB dev-mode warning -------------------------------
+you are seeing this because you use the RxDB dev-mode plugin https://rxdb.info/dev-mode.html?console=dev-mode
+This is great in development mode, because it will run many checks to ensure
+that you use RxDB correct. If you see this in production mode,
+you did something wrong because the dev-mode plugin will decrease the performance.
+
+🤗 Hint: To get the most out of RxDB, check out the Premium Plugins
+to get access to faster storages and more professional features: https://rxdb.info/premium/?console=dev-mode
+
+You can disable this warning by calling disableWarnings() from the dev-mode plugin.
+---------------------------------------------------------------------
 --- System Initialization ---
+ActionSubsystem: Registered executor: LogExecutor
+PerceptionSubsystem: Registered transducer: TextTransducer
+
+--- Scenario Setup ---
+Successfully registered and indexed schema for: test-schema-atom
+Schema registered. System is ready for controlled execution.
+
+--- Running Scenario (Continuous) ---
+Starting worker pool with 4 workers.
+Cognitive worker started (async mode).
+Worker 1 started.
+Cognitive worker started (async mode).
+Worker 2 started.
+Cognitive worker started (async mode).
+Worker 3 started.
+Cognitive worker started (async mode).
+Worker 4 started.
+Reflection loop started. Running every 1s.
+PerceptionSubsystem: Data from 'user_input' processed by TextTransducer.
+PerceptionSubsystem: Pushed new item to agenda: Observation: "initiate test..."
+ActionSubsystem: Executing goal Goal: Log system test message with LogExecutor
+[LogExecutor] System test successful
+ActionSubsystem: Goal Goal: Log system test message executed successfully.
+ReflectionLoop: Running self-audit cycle.
+AttentionModule: Running attention decay cycle...
+AttentionModule: Decayed attention for 3 items.
+ReflectionLoop: High contradiction rate detected (0.08). Pushing audit goal.
+ReflectionLoop: Running self-audit cycle.
+AttentionModule: Running attention decay cycle...
+AttentionModule: Decayed attention for 3 items.
+ReflectionLoop: High contradiction rate detected (0.09). Pushing audit goal.
+ReflectionLoop: Running self-audit cycle.
+AttentionModule: Running attention decay cycle...
+AttentionModule: Decayed attention for 3 items.
+
+--- Stopping System ---
+Stopping all workers in the pool...
+Cognitive worker stopping...
+Cognitive worker stopping...
+Cognitive worker stopping...
+Cognitive worker stopping...
+Reflection loop stopped.
 
 --- Verification ---
-Test with WorldModel commented out.
+✅ Goal was created: Goal: Log system test message
+Goal status: achieved
+✅ Goal was successfully achieved.
+
+--- Semantic Search Test ---
+✅ Semantic search returned the correct item: Belief: cat

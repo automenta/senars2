@@ -119,8 +119,8 @@ export class WorldModel implements IWorldModel {
         this.semanticIndex.initIndex(10000); // Max elements
     }
 
-    public async destroy() {
-        await this.db.destroy();
+    public async close() {
+        await this.db.close();
     }
 
     async add_atom(atom: SemanticAtom): Promise<UUID> {
@@ -174,7 +174,7 @@ export class WorldModel implements IWorldModel {
             return [];
         }
 
-        const items = await this.query_by_symbolic({ atom_id: { $in: atomIds } });
+        const items = await this.query_by_symbolic({ atom_id: { $in: atomIds } }, k);
 
         // Optional: Re-rank based on distance, though HNSW order is generally good
         return items;
@@ -182,18 +182,26 @@ export class WorldModel implements IWorldModel {
 
     async revise_belief(new_item: CognitiveItem): Promise<CognitiveItem | null> {
         if (new_item.type !== 'BELIEF' || !new_item.truth) return null;
+
         const existing_items = await this.query_by_symbolic({ atom_id: new_item.atom_id, type: 'BELIEF' }, 1);
         const existing_item = existing_items[0] ?? null;
+
         if (existing_item && existing_item.truth) {
+            // An item with this atom already exists, so revise it
             if (this.beliefRevisionEngine.detect_conflict(existing_item.truth, new_item.truth)) {
                 console.warn(`Conflict detected for atom ${new_item.atom_id}. Merging truth values.`);
             }
             const newTruth = this.beliefRevisionEngine.merge(existing_item.truth, new_item.truth);
             await this.update_item(existing_item.id, { truth: newTruth });
-            return null;
+
+            // Return the updated item to be pushed back on the agenda
+            const updated_item = await this.get_item(existing_item.id);
+            return updated_item;
         } else {
+            // This is a new belief, just add it
             await this.add_item(new_item);
-            return null;
+            // Returning the new item allows the worker to know it was successfully added
+            return new_item;
         }
     }
 

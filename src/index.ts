@@ -49,7 +49,7 @@ async function main() {
 
     console.log("\n--- Scenario Setup ---");
     await worldModel.add_atom(testTriggerSchemaAtom);
-    schemaMatcher.register_schema(testTriggerSchema, worldModel);
+    await schemaMatcher.register_schema(testTriggerSchema, worldModel);
     console.log("Schema registered. System is ready for controlled execution.");
 
     console.log("\n--- Running Scenario (Continuous) ---");

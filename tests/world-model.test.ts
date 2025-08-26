@@ -39,7 +39,7 @@ describe('WorldModel (Async)', () => {
     });
 
     afterAll(async () => {
-        await worldModel.destroy();
+        await worldModel.close();
     });
 
     it('should add and get an atom', async () => {
