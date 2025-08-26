@@ -117,7 +117,7 @@ export class CognitiveWorker {
             }
 
             // 5. Reinforce Attention
-            await this.attentionModule.update_on_access([itemA, ...contextItems], this.worldModel);
+            await this.attentionModule.update_on_access([itemA, ...contextItems], this.worldModel, this.agenda);
 
             // 6. Update Goal Tree
             if (itemA.type === "GOAL") {

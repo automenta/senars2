@@ -33,17 +33,23 @@ export class AttentionModule implements IAttentionModule {
         };
     }
 
-    async update_on_access(items: CognitiveItem[], world_model: WorldModel): Promise<void> {
+    async update_on_access(items: CognitiveItem[], world_model: WorldModel, agenda: Agenda): Promise<void> {
         for (const item of items) {
             const new_priority = Math.min(1.0, item.attention.priority + ACCESS_BOOST);
             const new_durability = Math.min(1.0, item.attention.durability + DURABILITY_BOOST);
-            await world_model.update_item(item.id, {
-                attention: {
-                    ...item.attention,
-                    priority: new_priority,
-                    durability: new_durability
-                }
-            });
+
+            const newAttention: AttentionValue = {
+                priority: new_priority,
+                durability: new_durability
+            };
+
+            const itemInAgenda = agenda.get(item.id);
+
+            if (itemInAgenda) {
+                agenda.updateAttention(item.id, newAttention);
+            } else {
+                await world_model.update_item(item.id, { attention: newAttention });
+            }
         }
     }
 
@@ -52,24 +58,33 @@ export class AttentionModule implements IAttentionModule {
         let decayedItems = 0;
 
         // Decay items in the WorldModel
-        const allItems = await world_model.getItemsByFilter(_ => true);
-        const updatePromises: Promise<void>[] = [];
+        const allWorldModelItems = await world_model.getItemsByFilter(_ => true);
+        const wmUpdatePromises: Promise<void>[] = [];
 
-        allItems.forEach(item => {
+        allWorldModelItems.forEach(item => {
             const newPriority = item.attention.priority * DECAY_FACTOR;
-            const newDurability = item.attention.durability * (DECAY_FACTOR + 0.01);
-
             const newAttention: AttentionValue = {
                 priority: newPriority < 0.01 ? 0 : newPriority,
-                durability: newDurability,
+                durability: item.attention.durability, // Let's not decay durability for now
             };
-
-            updatePromises.push(world_model.update_item(item.id, { attention: newAttention }));
+            wmUpdatePromises.push(world_model.update_item(item.id, { attention: newAttention }));
             decayedItems++;
         });
 
-        await Promise.all(updatePromises);
+        await Promise.all(wmUpdatePromises);
 
-        console.log(`AttentionModule: Decayed attention for ${decayedItems} items.`);
+        // Decay items in the Agenda
+        const allAgendaItems = agenda.getAllItems();
+        allAgendaItems.forEach((item: CognitiveItem) => {
+            const newPriority = item.attention.priority * DECAY_FACTOR;
+            const newAttention: AttentionValue = {
+                priority: newPriority < 0.01 ? 0 : newPriority,
+                durability: item.attention.durability,
+            };
+            agenda.updateAttention(item.id, newAttention);
+            decayedItems++;
+        });
+
+        console.log(`AttentionModule: Decayed attention for ${decayedItems} total items.`);
     }
 }

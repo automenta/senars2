@@ -25,6 +25,8 @@ export interface Agenda {
     size(): number;
     updateAttention(id: UUID, newVal: AttentionValue): void;
     remove(id: UUID): boolean;
+    getAllItems(): CognitiveItem[];
+    get(id: UUID): CognitiveItem | null;
 }
 
 export interface BeliefRevisionEngine {
@@ -54,7 +56,7 @@ export interface AttentionModule {
         schema: CognitiveSchema,
         source_trust?: number
     ): AttentionValue;
-    update_on_access(items: CognitiveItem[], world_model: WorldModel): Promise<void>;
+    update_on_access(items: CognitiveItem[], world_model: WorldModel, agenda: Agenda): Promise<void>;
     run_decay_cycle(world_model: WorldModel, agenda: Agenda): Promise<void>;
 }
 

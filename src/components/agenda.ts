@@ -1,6 +1,6 @@
 import { CognitiveItem, UUID, AttentionValue } from '../types/data';
 import { Agenda as IAgenda } from '../types/interfaces';
-import { PriorityQueue } from 'priority-queue-typescript';
+import { PriorityQueue } from '../lib/priority-queue';
 
 type PromiseResolver = (item: CognitiveItem) => void;
 
@@ -9,12 +9,8 @@ export class Agenda implements IAgenda {
     private waitingConsumers: PromiseResolver[] = [];
 
     constructor() {
-        // The library's comparator requires a number.
-        // It's a min-heap by default, so we reverse the logic for a max-heap.
-        this.queue = new PriorityQueue<CognitiveItem>(
-            100, // initial capacity
-            (a: CognitiveItem, b: CognitiveItem) => b.attention.priority - a.attention.priority
-        );
+        // We want a max-heap based on priority.
+        this.queue = new PriorityQueue<CognitiveItem>('Max');
     }
 
     push(item: CognitiveItem): void {
@@ -25,19 +21,21 @@ export class Agenda implements IAgenda {
                 return;
             }
         }
-        this.queue.add(item);
+        this.queue.push(item, item.attention.priority);
     }
 
     pop(): CognitiveItem | null {
-        if (this.queue.empty()) {
+        if (this.queue.isEmpty()) {
             return null;
         }
-        return this.queue.poll();
+        const item = this.queue.pop();
+        return item ? item.value : null;
     }
 
     async pop_async(): Promise<CognitiveItem> {
-        if (!this.queue.empty()) {
-            return this.queue.poll()!;
+        const item = this.pop();
+        if (item) {
+            return item;
         }
 
         return new Promise<CognitiveItem>((resolve) => {
@@ -46,10 +44,8 @@ export class Agenda implements IAgenda {
     }
 
     peek(): CognitiveItem | null {
-        if (this.queue.empty()) {
-            return null;
-        }
-        return this.queue.peek();
+        const item = this.queue.peek();
+        return item ? item.value : null;
     }
 
     size(): number {
@@ -57,31 +53,27 @@ export class Agenda implements IAgenda {
     }
 
     updateAttention(id: UUID, newVal: AttentionValue): void {
-        const items = this.queue.toArray();
-        this.queue.clear();
-
-        const itemToUpdate = items.find(i => i.id === id);
+        const itemToUpdate = this.queue.get(id);
         if (itemToUpdate) {
             itemToUpdate.attention = newVal;
+            this.queue.update(itemToUpdate, newVal.priority);
         }
-
-        items.forEach(item => this.queue.add(item));
     }
 
     remove(id: UUID): boolean {
-        const items = this.queue.toArray();
-        let found = false;
+        const itemToRemove = this.queue.get(id);
+        if (itemToRemove) {
+            return this.queue.remove(itemToRemove);
+        }
+        return false;
+    }
 
-        const filteredItems = items.filter(item => {
-            if (item.id === id) {
-                found = true;
-                return false;
-            }
-            return true;
-        });
+    // Method to get all items for decay cycle, etc.
+    getAllItems(): CognitiveItem[] {
+        return this.queue.toArray();
+    }
 
-        this.queue.clear();
-        filteredItems.forEach(item => this.queue.add(item));
-        return found;
+    get(id: UUID): CognitiveItem | null {
+        return this.queue.get(id);
     }
 }
