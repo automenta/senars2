@@ -9,6 +9,7 @@ import {
     BeliefRevisionEngine as IBeliefRevisionEngine,
     CognitiveSchema
 } from '../types/interfaces';
+import { EventBus } from '../core/event-bus';
 
 // HNSWLib for semantic search
 import { HierarchicalNSW } from 'hnswlib-node';
@@ -88,6 +89,7 @@ export class WorldModel implements IWorldModel {
     private atoms!: RxCollection<SemanticAtom>;
     private items!: RxCollection<CognitiveItem>;
     private beliefRevisionEngine = new BeliefRevisionEngine();
+    private eventBus!: EventBus;
 
     // Semantic Search Index
     private semanticIndex!: HierarchicalNSW;
@@ -96,13 +98,14 @@ export class WorldModel implements IWorldModel {
 
     private constructor() {}
 
-    public static async create(): Promise<WorldModel> {
+    public static async create(eventBus: EventBus): Promise<WorldModel> {
         const model = new WorldModel();
-        await model.initialize();
+        await model.initialize(eventBus);
         return model;
     }
 
-    private async initialize() {
+    private async initialize(eventBus: EventBus) {
+        this.eventBus = eventBus;
         this.db = await createRxDatabase({
             name: 'worldmodel_db',
             storage: wrappedValidateAjvStorage({ storage: getRxStorageMemory() }),
@@ -135,11 +138,22 @@ export class WorldModel implements IWorldModel {
 
     async add_item(item: CognitiveItem): Promise<void> {
         await this.items.insert(item);
+        this.eventBus.publish('item_added', { item });
+        if (item.type === 'GOAL') {
+            this.eventBus.publish('goal_added', { goal: item });
+        }
     }
 
     async update_item(id: UUID, patch: Partial<CognitiveItem>): Promise<void> {
         const doc = await this.items.findOne(id).exec();
-        if (doc) await doc.incrementalPatch(patch);
+        if (doc) {
+            const oldStatus = doc.get('goal_status');
+            await doc.incrementalPatch(patch);
+            const newStatus = doc.get('goal_status');
+            if (patch.goal_status && oldStatus !== newStatus) {
+                this.eventBus.publish('goal_status_changed', { goalId: id, oldStatus, newStatus });
+            }
+        }
     }
 
     async get_atom(id: UUID): Promise<SemanticAtom | null> {

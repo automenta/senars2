@@ -7,7 +7,7 @@ export type SemanticAtom = {
     content: any;
     embedding: number[];
     meta: {
-        type: "Fact" | "CognitiveSchema" | "Observation" | "Rule";
+        type: "Fact" | "CognitiveSchema" | "Observation" | "Rule" | "Action";
         source: string;
         timestamp: string;
         author: string;

@@ -51,7 +51,7 @@ export class CognitiveWorker {
                 const schemas = await this.schemaMatcher.find_applicable(itemA, itemB, this.worldModel);
                 for (const schema of schemas) {
                     try {
-                        const derivedData = schema.apply(itemA, itemB, this.worldModel);
+                        const derivedData = await schema.apply(itemA, itemB, this.worldModel);
 
                         // Add new atoms to the world model first
                         for (const newAtom of derivedData.atoms) {

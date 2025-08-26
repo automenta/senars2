@@ -14,7 +14,7 @@ export type SchemaDerivedData = {
 // Forward declaration for CognitiveSchema
 export interface CognitiveSchema {
     atom_id: UUID;
-    apply(a: CognitiveItem, b: CognitiveItem, world_model: WorldModel): SchemaDerivedData;
+    apply(a: CognitiveItem, b: CognitiveItem, world_model: WorldModel): Promise<SchemaDerivedData>;
 }
 
 export interface Agenda {

@@ -26,7 +26,7 @@ export const testTriggerSchemaAtom: SemanticAtom = {
 
 export const testTriggerSchema: CognitiveSchema = {
     atom_id: testTriggerSchemaAtom.id,
-    apply: (a: CognitiveItem, b: CognitiveItem, wm: WorldModel): SchemaDerivedData => {
+    apply: async (a: CognitiveItem, b: CognitiveItem, wm: WorldModel): Promise<SchemaDerivedData> => {
 
         const goal_content = { command: 'log', message: 'System test successful' };
         const goal_meta = {
