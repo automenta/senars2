@@ -48,6 +48,8 @@ export class DefaultBeliefRevisionEngine implements BeliefRevisionEngine {
 
 export interface WorldModel extends EventEmitter {
   add_atom(atom: SemanticAtom): UUID;
+  update_atom(id: UUID, meta: Partial<SemanticAtomMetadata>): void;
+  remove_atom(id: UUID): void;
   add_item(item: CognitiveItem): void;
   update_item(id: UUID, item: CognitiveItem): void;
   get_atom(id: UUID): SemanticAtom | null;
@@ -77,6 +79,7 @@ export class WorldModelImpl extends EventEmitter implements WorldModel {
   private structuralIndex: Map<UUID, any> = new Map(); // atom ID -> structured content
   private atomIdToItemIds: Map<UUID, Set<UUID>> = new Map();
   private hnswLabelToAtomId: Map<number, UUID> = new Map();
+  private atomIdToHnswLabel: Map<UUID, number> = new Map();
   private nextHnswLabel: number = 0;
 
   // Modules
@@ -112,6 +115,7 @@ export class WorldModelImpl extends EventEmitter implements WorldModel {
     if (atom.embedding && atom.embedding.length > 0) {
       const label = this.nextHnswLabel++;
       this.hnswLabelToAtomId.set(label, atom.id);
+      this.atomIdToHnswLabel.set(atom.id, label);
       this.semanticIndex.addPoint(atom.embedding, label);
     }
 
@@ -121,6 +125,51 @@ export class WorldModelImpl extends EventEmitter implements WorldModel {
     }
 
     return atom.id;
+  }
+
+  update_atom(id: UUID, meta: Partial<SemanticAtomMetadata>): void {
+    const atom = this.atoms.get(id);
+    if (atom) {
+      atom.meta = { ...atom.meta, ...meta };
+      this.emit('atom_updated', atom);
+    }
+  }
+
+  remove_atom(id: UUID): void {
+    const atom = this.atoms.get(id);
+    if (!atom) return;
+
+    // 1. Remove from core storage
+    this.atoms.delete(id);
+
+    // 2. Remove from symbolic index
+    const contentHash = stableStringify(atom.content);
+    if (contentHash && this.symbolicIndex.get(contentHash) === id) {
+      this.symbolicIndex.delete(contentHash);
+    }
+
+    // 3. Remove from semantic index
+    const label = this.atomIdToHnswLabel.get(id);
+    if (label !== undefined) {
+      this.semanticIndex.removePoint(label);
+      this.hnswLabelToAtomId.delete(label);
+      this.atomIdToHnswLabel.delete(id);
+    }
+
+    // 4. Remove from structural index
+    this.structuralIndex.delete(id);
+
+    // 5. Remove associated items
+    const itemIds = this.atomIdToItemIds.get(id);
+    if (itemIds) {
+        for (const itemId of itemIds) {
+            this.items.delete(itemId);
+            this.emit('item_removed', { id: itemId, atom_id: id });
+        }
+        this.atomIdToItemIds.delete(id);
+    }
+
+    this.emit('atom_removed', atom);
   }
 
   add_item(item: CognitiveItem): void {

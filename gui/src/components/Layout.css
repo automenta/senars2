@@ -301,3 +301,50 @@
   font-size: 0.8rem;
   font-weight: 500;
 }
+
+/* World Model View - Cognitive Items */
+.cognitive-items-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cognitive-item-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #f9fafb;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.item-type-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.7rem;
+  color: white;
+  flex-shrink: 0;
+}
+
+.item-type-badge.BELIEF { background-color: #22c55e; } /* Green */
+.item-type-badge.GOAL { background-color: #3b82f6; } /* Blue */
+.item-type-badge.QUERY { background-color: #f97316; } /* Orange */
+
+.item-label {
+  flex-grow: 1;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-truth, .item-priority {
+  color: #6b7280;
+  font-size: 0.8rem;
+  background-color: #e5e7eb;
+  padding: 2px 6px;
+  border-radius: 4px;
+}

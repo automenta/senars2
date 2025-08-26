@@ -1,0 +1,58 @@
+.status-bar {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #333;
+  color: white;
+  z-index: 1000;
+  transition: background-color 0.3s ease;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  transition: background-color 0.3s ease;
+}
+
+.status-bar.connecting .status-indicator {
+  background-color: #f39c12; /* Orange */
+  animation: pulse 1.5s infinite;
+}
+
+.status-bar.connected .status-indicator {
+  background-color: #2ecc71; /* Green */
+}
+
+.status-bar.error .status-indicator {
+  background-color: #e74c3c; /* Red */
+}
+
+.status-bar.error {
+  background-color: #c0392b;
+}
+
+.status-text {
+  font-weight: 500;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+}

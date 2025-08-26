@@ -1,25 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { SemanticAtom } from '../types';
+import React, { useState } from 'react';
+import { SemanticAtom, CognitiveItem, UUID } from '../types';
 
-function WorldModelView() {
-  const [worldModelAtoms, setWorldModelAtoms] = useState<SemanticAtom[]>([]);
+interface WorldModelViewProps {
+  worldModelAtoms: SemanticAtom[];
+  worldModelItems: Record<UUID, CognitiveItem[]>;
+}
+
+function WorldModelView({ worldModelAtoms, worldModelItems }: WorldModelViewProps) {
   const [expandedAtoms, setExpandedAtoms] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('all');
-
-  useEffect(() => {
-    const ws = new WebSocket('ws://localhost:3001');
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.worldModel) {
-        setWorldModelAtoms(data.worldModel);
-      }
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, []);
 
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expandedAtoms);
@@ -96,6 +85,30 @@ function WorldModelView() {
                     <div className="detail-section">
                       <h4>Full Content</h4>
                       <pre>{JSON.stringify(atom.content, null, 2)}</pre>
+                    </div>
+
+                    <div className="detail-section">
+                      <h4>Cognitive Items ({ (worldModelItems[atom.id] || []).length})</h4>
+                      <div className="cognitive-items-list">
+                        {(worldModelItems[atom.id] || []).length > 0 ? (
+                          (worldModelItems[atom.id] || []).map(item => (
+                            <div key={item.id} className="cognitive-item-summary">
+                              <span className={`item-type-badge ${item.type}`}>{item.type}</span>
+                              <span className="item-label">{item.label || item.id}</span>
+                              {item.truth && (
+                                <span className="item-truth">
+                                  Truth: {(item.truth.confidence * 100).toFixed(0)}%
+                                </span>
+                              )}
+                              <span className="item-priority">
+                                Prio: {item.attention.priority.toFixed(2)}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <p>No cognitive items directly reference this atom.</p>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="detail-section">

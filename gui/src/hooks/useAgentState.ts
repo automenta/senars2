@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CognitiveItem, UUID } from '../types';
+import { CognitiveItem, UUID, SemanticAtom } from '../types';
 
 // Define the structure of the goal tree as received from the server
 export interface GoalNode {
@@ -9,8 +9,9 @@ export interface GoalNode {
 
 export interface AgentState {
   agenda: CognitiveItem[];
-  worldModel: any[]; // Define a proper type if needed
+  worldModel: SemanticAtom[];
   goalTree: Record<UUID, GoalNode>;
+  worldModelItems: Record<UUID, CognitiveItem[]>;
 }
 
 const WEBSOCKET_URL = 'ws://localhost:3001';
@@ -20,6 +21,7 @@ export function useAgentState() {
     agenda: [],
     worldModel: [],
     goalTree: {},
+    worldModelItems: {},
   });
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +42,16 @@ export function useAgentState() {
 
         switch (type) {
           case 'full_state':
-            setState(payload);
+            const { worldModelItems: items, ...restOfPayload } = payload;
+            const itemsByAtom = (items || []).reduce((acc: Record<UUID, CognitiveItem[]>, item: CognitiveItem) => {
+              const atomId = item.atom_id;
+              if (!acc[atomId]) {
+                acc[atomId] = [];
+              }
+              acc[atomId].push(item);
+              return acc;
+            }, {});
+            setState({ ...restOfPayload, worldModelItems: itemsByAtom });
             break;
 
           // Agenda updates
@@ -65,18 +76,69 @@ export function useAgentState() {
 
           // World Model updates
           case 'world_model_atom_added':
-             setState(prevState => ({
+            setState(prevState => ({
               ...prevState,
               worldModel: [...prevState.worldModel, payload],
             }));
             break;
-           case 'world_model_item_added':
-            // This is complex because items are not directly in the world model view
-            // For now, we can just log it. A better implementation might update a separate item list.
-            console.log('World model item added:', payload);
+          case 'world_model_atom_updated':
+            setState(prevState => ({
+              ...prevState,
+              worldModel: prevState.worldModel.map(atom =>
+                atom.id === payload.id ? payload : atom
+              ),
+            }));
+            break;
+          case 'world_model_atom_removed':
+            setState(prevState => ({
+              ...prevState,
+              worldModel: prevState.worldModel.filter(atom => atom.id !== payload.id),
+            }));
+            break;
+          case 'world_model_item_added':
+            setState(prevState => {
+              const { atom_id, id } = payload;
+              const newItemsForAtom = [...(prevState.worldModelItems[atom_id] || [])];
+              // Avoid duplicates
+              if (!newItemsForAtom.some(item => item.id === id)) {
+                newItemsForAtom.push(payload);
+              }
+              return {
+                ...prevState,
+                worldModelItems: {
+                  ...prevState.worldModelItems,
+                  [atom_id]: newItemsForAtom,
+                },
+              };
+            });
             break;
           case 'world_model_item_updated':
-            console.log('World model item updated:', payload);
+            setState(prevState => {
+              const { atom_id, id } = payload;
+              const newItemsForAtom = (prevState.worldModelItems[atom_id] || []).map(item =>
+                item.id === id ? payload : item
+              );
+              return {
+                ...prevState,
+                worldModelItems: {
+                  ...prevState.worldModelItems,
+                  [atom_id]: newItemsForAtom,
+                },
+              };
+            });
+            break;
+          case 'world_model_item_removed':
+            setState(prevState => {
+                const { atom_id, id } = payload;
+                const newItemsForAtom = (prevState.worldModelItems[atom_id] || []).filter(item => item.id !== id);
+                return {
+                    ...prevState,
+                    worldModelItems: {
+                        ...prevState.worldModelItems,
+                        [atom_id]: newItemsForAtom,
+                    },
+                };
+            });
             break;
 
           // Goal Tree updates

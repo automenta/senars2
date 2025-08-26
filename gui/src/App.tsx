@@ -1,17 +1,19 @@
 import './App.css';
 import CognitiveFlowView from './components/CognitiveFlowView';
-import { Menu, Search } from 'lucide-react'; // Using lucide-react for icons
+import WorldModelView from './components/WorldModelView';
+import StatusBar from './components/StatusBar';
+import { useAgentState } from './hooks/useAgentState';
+import { Menu, Search } from 'lucide-react';
 import './components/Layout.css';
 
 function App() {
-  // The main view is now the CognitiveFlowView, replacing the tab-based navigation.
-  // Other views can be accessed through a dropdown menu or other UI elements if needed.
+  const { state, isConnected, error } = useAgentState();
+
   return (
     <div className="app-container">
       <header className="top-bar">
         <div className="logo">🧠 COGNITIVE AGENT</div>
         <nav className="nav-actions">
-          {/* Placeholder for future navigation like a dropdown menu */}
           <button className="menu-button"><Menu size={20} /></button>
         </nav>
         <div className="search-bar">
@@ -21,7 +23,12 @@ function App() {
       </header>
       <main className="main-content">
         <CognitiveFlowView />
+        <WorldModelView
+          worldModelAtoms={state.worldModel}
+          worldModelItems={state.worldModelItems}
+        />
       </main>
+      <StatusBar isConnected={isConnected} error={error} />
     </div>
   );
 }

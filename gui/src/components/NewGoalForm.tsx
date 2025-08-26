@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { debounce } from 'lodash';
+import { apiClient } from '../apiClient';
 
 interface NewGoalFormProps {
   onClose: () => void;
@@ -24,13 +25,7 @@ const NewGoalForm: React.FC<NewGoalFormProps> = ({ onClose }) => {
       return;
     }
     try {
-      const response = await fetch('/api/compose-goal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      if (!response.ok) throw new Error('Failed to fetch composition');
-      const data = await response.json();
+      const data = await apiClient.composeGoal(text);
       setComposition(data);
     } catch (err) {
       console.error('Failed to fetch goal composition:', err);
@@ -51,17 +46,7 @@ const NewGoalForm: React.FC<NewGoalFormProps> = ({ onClose }) => {
     setError(null);
 
     try {
-      const response = await fetch('/api/input', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: `GOAL: ${textToSubmit}` }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit goal.');
-      }
-
+      await apiClient.submitInput(`GOAL: ${textToSubmit}`);
       console.log('Goal submitted successfully');
       setGoalText('');
       onClose(); // Close the form on successful submission

@@ -60,8 +60,11 @@ function setupEventBroadcasting(agenda: Agenda, worldModel: WorldModel, goalTree
     agenda.on('item_updated', (item) => broadcast({ type: 'agenda_item_updated', payload: item }));
 
     worldModel.on('atom_added', (atom) => broadcast({ type: 'world_model_atom_added', payload: atom }));
+    worldModel.on('atom_updated', (atom) => broadcast({ type: 'world_model_atom_updated', payload: atom }));
+    worldModel.on('atom_removed', (atom) => broadcast({ type: 'world_model_atom_removed', payload: atom }));
     worldModel.on('item_added', (item) => broadcast({ type: 'world_model_item_added', payload: item }));
     worldModel.on('item_updated', (item) => broadcast({ type: 'world_model_item_updated', payload: item }));
+    worldModel.on('item_removed', (item) => broadcast({ type: 'world_model_item_removed', payload: item }));
 
     goalTreeManager.on('goal_added', (goal) => broadcast({ type: 'goal_tree_goal_added', payload: goal }));
     goalTreeManager.on('goal_updated', (goal) => broadcast({ type: 'goal_tree_goal_updated', payload: goal }));
@@ -80,6 +83,7 @@ wss.on('connection', (ws) => {
     payload: {
         agenda: agenda.getItems(),
         worldModel: worldModel.get_all_atoms(),
+        worldModelItems: worldModel.get_all_items(),
         goalTree: serializeGoalTree(cognitiveCore.getModules().goalTree.get_goal_tree()),
     }
   };
@@ -120,11 +124,10 @@ cognitiveCore.initialize().then(async () => {
     if (updatedFactBelief.truth) {
         updatedFactBelief.truth.confidence = 0.95;
     }
-    const factAtom = worldModel.get_atom(updatedFactBelief.atom_id);
-    if (factAtom) {
-      factAtom.meta.trust_score = 0.95;
-      factAtom.meta.source = 'vetdb.org';
-    }
+    worldModel.update_atom(updatedFactBelief.atom_id, {
+        trust_score: 0.95,
+        source: 'vetdb.org'
+    });
     agenda.push(updatedFactBelief);
   }
 
