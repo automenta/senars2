@@ -12,13 +12,9 @@ import { GoalTreeManager } from '../src/modules/goal-tree-manager';
 import { LogExecutor } from '../src/executors/log-executor';
 import { TextTransducer } from '../src/transducers/text-transducer';
 
-import { SemanticAtom, CognitiveItem, UUID } from '../src/types/data';
-import { createAtomId } from '../src/lib/utils';
-import { v4 as uuidv4 } from 'uuid';
-
+import { ovenSafetySchema, ovenSafetySchemaAtom } from '../src/schemas/oven-safety-schema';
 
 describe("Cognitive Architecture Integration Test", () => {
-
     let agenda: Agenda;
     let worldModel: WorldModel;
     let actionSubsystem: ActionSubsystem;
@@ -26,10 +22,10 @@ describe("Cognitive Architecture Integration Test", () => {
     let schemaMatcher: SchemaMatcher;
     let worker: CognitiveWorker;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         // --- Full system setup ---
         agenda = new Agenda();
-        worldModel = new WorldModel();
+        worldModel = await WorldModel.create();
 
         actionSubsystem = new ActionSubsystem(worldModel);
         actionSubsystem.register_executor(new LogExecutor());
@@ -52,41 +48,8 @@ describe("Cognitive Architecture Integration Test", () => {
 
     test("Should perceive data, reason to create a goal, and execute the goal", async () => {
         // 1. Define and register a reasoning schema
-        const schemaContent = {
-            pattern: {
-                a: { type: 'BELIEF', 'atom.content.text': 'the oven is on' }
-            },
-            apply_args: ['ctx'],
-            apply_logic: `
-                const { a, wm, uuidv4, createAtomId } = ctx;
-                const goal_content = { command: 'log', message: 'Action: Turn off the oven.' };
-                const goal_meta = {
-                    type: "Fact", source: "reasoning:safety-schema", timestamp: new Date().toISOString(),
-                    author: "system", trust_score: 1.0, domain: "safety", license: "internal"
-                };
-                const goal_atom = {
-                    id: createAtomId(goal_content, goal_meta), content: goal_content, embedding: [], meta: goal_meta
-                };
-                const goal_item = {
-                    id: uuidv4(), atom_id: goal_atom.id, type: 'GOAL',
-                    attention: { priority: 1.0, durability: 0.9 },
-                    stamp: { timestamp: Date.now(), parent_ids: [a.id], schema_id: 'safety-schema-atom' },
-                    goal_status: 'active', label: "Turn off oven"
-                };
-                wm.add_atom(goal_atom);
-                return [goal_item];
-            `
-        };
-        const schemaAtom: SemanticAtom = {
-            id: 'safety-schema-atom' as any, content: schemaContent, embedding: [],
-            meta: {
-                type: 'CognitiveSchema', source: 'system_definition', timestamp: new Date().toISOString(),
-                author: 'system', trust_score: 1.0, domain: 'safety',
-                label: 'Oven Safety Schema', license: 'internal'
-            }
-        };
-        worldModel.add_atom(schemaAtom);
-        schemaMatcher.register_schema(schemaAtom, worldModel);
+        await worldModel.add_atom(ovenSafetySchemaAtom);
+        schemaMatcher.register_schema(ovenSafetySchema, worldModel);
 
         // 2. Perception
         perceptionSubsystem.process("the oven is on", "user_report");
@@ -102,7 +65,7 @@ describe("Cognitive Architecture Integration Test", () => {
         expect(goalItem?.label).toBe('Turn off oven');
 
         // Verify the goal was added to the world model
-        const goalInWorld = worldModel.get_item(goalItem!.id);
+        const goalInWorld = await worldModel.get_item(goalItem!.id);
         expect(goalInWorld).toBeDefined();
 
         // 4. Tick 2: Process the goal, execute the action
@@ -110,7 +73,10 @@ describe("Cognitive Architecture Integration Test", () => {
         await worker.tick();
 
         expect(logSpy).toHaveBeenCalledWith('[LogExecutor] Action: Turn off the oven.');
-        expect(goalItem?.goal_status).toBe('achieved');
+
+        // Verify the goal was marked as achieved in the database
+        const finalGoal = await worldModel.get_item(goalItem!.id);
+        expect(finalGoal?.goal_status).toBe('achieved');
 
         // 5. Tick 3: Process the belief from the action
         expect(agenda.size()).toBe(1);

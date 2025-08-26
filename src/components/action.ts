@@ -11,12 +11,21 @@ export class ActionSubsystem {
         console.log(`ActionSubsystem: Registered executor: ${executor.constructor.name}`);
     }
 
+    private async find_executor(goal: CognitiveItem): Promise<Executor | null> {
+        for (const executor of this.executors) {
+            if (await executor.can_execute(goal, this.worldModel)) {
+                return executor;
+            }
+        }
+        return null;
+    }
+
     async execute_goal(goal: CognitiveItem): Promise<CognitiveItem | null> {
         if (goal.type !== 'GOAL') {
             return null;
         }
 
-        const executor = this.executors.find(e => e.can_execute(goal, this.worldModel));
+        const executor = await this.find_executor(goal);
 
         if (!executor) {
             // It's normal for some goals not to have an executor (e.g., abstract goals)
@@ -28,10 +37,10 @@ export class ActionSubsystem {
             const result = await executor.execute(goal, this.worldModel);
 
             // Add the new atom from the action's result to the world model
-            this.worldModel.add_atom(result.atom);
+            await this.worldModel.add_atom(result.atom);
 
             // Mark the original goal as achieved
-            goal.goal_status = 'achieved';
+            await this.worldModel.update_item(goal.id, { goal_status: 'achieved' });
 
             console.log(`ActionSubsystem: Goal ${goal.label ?? goal.id} executed successfully.`);
 
@@ -40,6 +49,7 @@ export class ActionSubsystem {
         } catch (error) {
             console.error(`ActionSubsystem: Executor ${executor.constructor.name} failed for goal ${goal.label ?? goal.id}`, error);
             // Mark the goal as failed
+            // TODO: This mutation is on a copy. Use a WorldModel.update() method to persist.
             goal.goal_status = 'failed';
             return null;
         }

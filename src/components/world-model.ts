@@ -9,168 +9,185 @@ import {
     BeliefRevisionEngine as IBeliefRevisionEngine,
     CognitiveSchema
 } from '../types/interfaces';
-import { getProperty } from '../lib/utils';
+import { cosineSimilarity } from '../lib/utils';
 
+// RxDB Imports
+import {
+    createRxDatabase,
+    addRxPlugin,
+    RxDatabase,
+    RxCollection,
+    RxJsonSchema
+} from 'rxdb';
+import { getRxStorageMemory } from 'rxdb/plugins/storage-memory';
+import { RxDBDevModePlugin } from 'rxdb/plugins/dev-mode';
+import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv';
+
+addRxPlugin(RxDBDevModePlugin);
+
+// --- Schema Definitions ---
+const atomSchema: RxJsonSchema<SemanticAtom> = {
+    title: 'semantic atom schema',
+    version: 0,
+    description: 'A content-addressable unit of knowledge',
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: { type: 'string', maxLength: 100 },
+        content: { type: 'object' },
+        embedding: { type: 'array', items: { type: 'number' } },
+        meta: { type: 'object' }
+    },
+    required: ['id', 'content', 'meta']
+};
+
+const itemSchema: RxJsonSchema<CognitiveItem> = {
+    title: 'cognitive item schema',
+    version: 0,
+    description: 'A contextualized thought or stance towards an atom',
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: { type: 'string', maxLength: 100 },
+        atom_id: { type: 'string', maxLength: 100 },
+        type: { type: 'string', maxLength: 10 },
+        truth: { type: 'object' },
+        attention: { type: 'object' },
+        stamp: { type: 'object' },
+        goal_parent_id: { type: 'string', maxLength: 100 },
+        goal_status: { type: 'string', maxLength: 10 },
+        label: { type: 'string' }
+    },
+    required: ['id', 'atom_id', 'type', 'attention', 'stamp'],
+    indexes: ['atom_id', 'type', 'goal_parent_id', 'goal_status']
+};
+
+// --- Belief Revision Engine ---
 export class BeliefRevisionEngine implements IBeliefRevisionEngine {
     merge(existing: TruthValue, newTruth: TruthValue): TruthValue {
         const w1 = existing.confidence;
         const w2 = newTruth.confidence;
         const totalW = w1 + w2;
-
-        if (totalW === 0) {
-            return { frequency: 0, confidence: 0 };
-        }
-
+        if (totalW === 0) return { frequency: 0, confidence: 0 };
         const frequency = (w1 * existing.frequency + w2 * newTruth.frequency) / totalW;
         const confidence = Math.min(0.99, (w1 + w2) / 2 + 0.1);
-
         return { frequency, confidence };
     }
-
     detect_conflict(a: TruthValue, b: TruthValue): boolean {
         return Math.abs(a.frequency - b.frequency) > 0.5 && a.confidence > 0.7 && b.confidence > 0.7;
     }
 }
 
-// Helper functions for querying
-function cosineSimilarity(vecA: number[], vecB: number[]): number {
-    if (vecA.length !== vecB.length || vecA.length === 0) {
-        return 0;
-    }
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-    for (let i = 0; i < vecA.length; i++) {
-        dotProduct += vecA[i] * vecB[i];
-        normA += vecA[i] * vecA[i];
-        normB += vecB[i] * vecB[i];
-    }
-    if (normA === 0 || normB === 0) {
-        return 0;
-    }
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
+// --- World Model Implementation ---
 export class WorldModel implements IWorldModel {
-    private atoms = new Map<UUID, SemanticAtom>();
-    private items = new Map<UUID, CognitiveItem>();
+    private db!: RxDatabase;
+    private atoms!: RxCollection<SemanticAtom>;
+    private items!: RxCollection<CognitiveItem>;
     private beliefRevisionEngine = new BeliefRevisionEngine();
-    private belief_by_atom_id = new Map<UUID, UUID>(); // Index for faster belief revision
 
-    add_atom(atom: SemanticAtom): UUID {
-        this.atoms.set(atom.id, atom);
+    private constructor() {}
+
+    public static async create(): Promise<WorldModel> {
+        const model = new WorldModel();
+        await model.initialize();
+        return model;
+    }
+
+    private async initialize() {
+        this.db = await createRxDatabase({
+            name: 'worldmodel_db',
+            storage: wrappedValidateAjvStorage({ storage: getRxStorageMemory() }),
+        });
+        const collections = await this.db.addCollections({
+            atoms: { schema: atomSchema },
+            items: { schema: itemSchema },
+        });
+        this.atoms = collections.atoms;
+        this.items = collections.items;
+    }
+
+    public async destroy() {
+        await this.db.destroy();
+    }
+
+    async add_atom(atom: SemanticAtom): Promise<UUID> {
+        await this.atoms.insert(atom);
         return atom.id;
     }
 
-    add_item(item: CognitiveItem): void {
-        this.items.set(item.id, item);
-        if (item.type === 'BELIEF') {
-            this.belief_by_atom_id.set(item.atom_id, item.id);
-        }
+    async add_item(item: CognitiveItem): Promise<void> {
+        await this.items.insert(item);
     }
 
-    get_atom(id: UUID): SemanticAtom | null {
-        return this.atoms.get(id) || null;
+    async update_item(id: UUID, patch: Partial<CognitiveItem>): Promise<void> {
+        const doc = await this.items.findOne(id).exec();
+        if (doc) await doc.incrementalPatch(patch);
     }
 
-    get_item(id: UUID): CognitiveItem | null {
-        return this.items.get(id) || null;
+    async get_atom(id: UUID): Promise<SemanticAtom | null> {
+        const doc = await this.atoms.findOne(id).exec();
+        return doc ? doc.toMutableJSON() : null;
     }
 
-    query_by_semantic(embedding: number[], k: number): CognitiveItem[] {
-        const scoredItems = Array.from(this.items.values()).map(item => {
-            const atom = this.get_atom(item.atom_id);
-            if (!atom || !atom.embedding || atom.embedding.length === 0) {
-                return { item, score: -1 };
-            }
-            const score = cosineSimilarity(embedding, atom.embedding);
-            return { item, score };
-        });
-
-        scoredItems.sort((a, b) => b.score - a.score);
-
-        return scoredItems.slice(0, k).map(si => si.item);
+    async get_item(id: UUID): Promise<CognitiveItem | null> {
+        const doc = await this.items.findOne(id).exec();
+        return doc ? doc.toMutableJSON() : null;
     }
 
-    query_by_symbolic(pattern: any, k?: number): CognitiveItem[] {
-        const results: CognitiveItem[] = [];
-        for (const item of this.items.values()) {
-            const atom = this.get_atom(item.atom_id);
-            if (!atom) continue;
-
-            let isMatch = true;
-            for (const key in pattern) {
-                const expectedValue = pattern[key];
-                // Support checks on the item itself or its atom
-                const actualValue = getProperty({item, atom}, key);
-                if (actualValue !== expectedValue) {
-                    isMatch = false;
-                    break;
-                }
-            }
-
-            if (isMatch) {
-                results.push(item);
-                if (k && results.length >= k) {
-                    break;
-                }
-            }
-        }
-        return results;
+    async query_by_symbolic(pattern: any, k?: number): Promise<CognitiveItem[]> {
+        const query = this.items.find({ selector: pattern, limit: k });
+        const docs = await query.exec();
+        return docs.map(doc => doc.toMutableJSON());
     }
 
-    query_by_structure(pattern: any, k?: number): CognitiveItem[] {
-        // For now, this is an alias for symbolic search. A more advanced
-        // implementation could handle complex graph or S-expression patterns.
+    async query_by_structure(pattern: any, k?: number): Promise<CognitiveItem[]> {
         return this.query_by_symbolic(pattern, k);
     }
 
-    revise_belief(new_item: CognitiveItem): CognitiveItem | null {
-        if (new_item.type !== 'BELIEF' || !new_item.truth) {
-            return null;
+    async query_by_semantic(embedding: number[], k: number): Promise<CognitiveItem[]> {
+        const allItems = await this.items.find().exec();
+        const scoredItems = [];
+        for (const itemDoc of allItems) {
+            const item = itemDoc.toMutableJSON();
+            const atom = await this.get_atom(item.atom_id);
+            if (atom && atom.embedding && atom.embedding.length > 0) {
+                const score = cosineSimilarity(embedding, atom.embedding);
+                scoredItems.push({ item, score });
+            }
         }
+        scoredItems.sort((a, b) => b.score - a.score);
+        return scoredItems.slice(0, k).map(si => si.item);
+    }
 
-        const existing_item_id = this.belief_by_atom_id.get(new_item.atom_id);
-        const existing_item = existing_item_id ? this.items.get(existing_item_id) : undefined;
-
+    async revise_belief(new_item: CognitiveItem): Promise<CognitiveItem | null> {
+        if (new_item.type !== 'BELIEF' || !new_item.truth) return null;
+        const existing_items = await this.query_by_symbolic({ atom_id: new_item.atom_id, type: 'BELIEF' }, 1);
+        const existing_item = existing_items[0] ?? null;
         if (existing_item && existing_item.truth) {
             if (this.beliefRevisionEngine.detect_conflict(existing_item.truth, new_item.truth)) {
-                // In a real system, this might create a GOAL to resolve the conflict.
                 console.warn(`Conflict detected for atom ${new_item.atom_id}. Merging truth values.`);
             }
             const newTruth = this.beliefRevisionEngine.merge(existing_item.truth, new_item.truth);
-            existing_item.truth = newTruth;
-            // The existing item is updated in place.
+            await this.update_item(existing_item.id, { truth: newTruth });
             return null;
         } else {
-            // This is a new belief, so we add and index it.
-            this.add_item(new_item);
+            await this.add_item(new_item);
+            return null;
         }
-        return null;
     }
 
-    size(): number {
-        return this.atoms.size;
+    async size(): Promise<number> {
+        const allDocs = await this.atoms.find().exec();
+        return allDocs.length;
     }
 
     register_schema_atom(atom: SemanticAtom): CognitiveSchema {
-        // This is a placeholder. The actual implementation will be in the SchemaMatcher.
         throw new Error("Schema registration not implemented in WorldModel. See SchemaMatcher.");
     }
 
-    /**
-     * Retrieves all cognitive items that match a given filter function.
-     * NOTE: This is for debugging and testing. It iterates through all items.
-     * @param filter The function to test each item.
-     * @returns An array of matching items.
-     */
-    public getItemsByFilter(filter: (item: CognitiveItem) => boolean): CognitiveItem[] {
-        const results: CognitiveItem[] = [];
-        for (const item of this.items.values()) {
-            if (filter(item)) {
-                results.push(item);
-            }
-        }
-        return results;
+    async getItemsByFilter(filter: (item: CognitiveItem) => boolean): Promise<CognitiveItem[]> {
+        const allItems = await this.items.find().exec();
+        const mutableItems = allItems.map(doc => doc.toMutableJSON());
+        return mutableItems.filter(filter);
     }
 }

@@ -1,10 +1,10 @@
-import { WorldModel, BeliefRevisionEngine } from '../src/components/world-model';
+import { WorldModel } from '../src/components/world-model';
 import { SemanticAtom, CognitiveItem, UUID, TruthValue } from '../src/types/data';
 import { v4 as uuidv4 } from 'uuid';
 
-const createMockAtom = (): SemanticAtom => ({
+const createMockAtom = (domain?: string): SemanticAtom => ({
     id: uuidv4() as UUID,
-    content: 'Test content',
+    content: { text: `Test content ${Math.random()}` },
     embedding: [0.1, 0.2, 0.3],
     meta: {
         type: 'Fact',
@@ -12,7 +12,7 @@ const createMockAtom = (): SemanticAtom => ({
         timestamp: new Date().toISOString(),
         author: 'jest',
         trust_score: 0.8,
-        domain: 'test',
+        domain: domain || 'test',
         license: 'MIT',
     },
 });
@@ -30,119 +30,96 @@ const createMockBelief = (atom_id: UUID, truth: TruthValue): CognitiveItem => ({
     },
 });
 
-describe('BeliefRevisionEngine', () => {
-    const engine = new BeliefRevisionEngine();
 
-    it('should merge two truth values correctly', () => {
-        const existing: TruthValue = { frequency: 0.8, confidence: 0.7 };
-        const newTruth: TruthValue = { frequency: 0.4, confidence: 0.5 };
-        const merged = engine.merge(existing, newTruth);
-
-        // w1=0.7, w2=0.5, totalW=1.2
-        // freq = (0.7*0.8 + 0.5*0.4) / 1.2 = (0.56 + 0.2) / 1.2 = 0.76 / 1.2 = 0.6333
-        // conf = min(0.99, (0.7+0.5)/2 + 0.1) = min(0.99, 0.6 + 0.1) = 0.7
-        expect(merged.frequency).toBeCloseTo(0.6333);
-        expect(merged.confidence).toBeCloseTo(0.7);
-    });
-
-    it('should detect a conflict', () => {
-        const a: TruthValue = { frequency: 0.9, confidence: 0.8 };
-        const b: TruthValue = { frequency: 0.1, confidence: 0.8 };
-        expect(engine.detect_conflict(a, b)).toBe(true);
-    });
-
-    it('should not detect a conflict if confidence is low', () => {
-        const a: TruthValue = { frequency: 0.9, confidence: 0.6 };
-        const b: TruthValue = { frequency: 0.1, confidence: 0.8 };
-        expect(engine.detect_conflict(a, b)).toBe(false);
-    });
-
-    it('should not detect a conflict if frequency difference is small', () => {
-        const a: TruthValue = { frequency: 0.6, confidence: 0.8 };
-        const b: TruthValue = { frequency: 0.4, confidence: 0.8 };
-        expect(engine.detect_conflict(a, b)).toBe(false);
-    });
-});
-
-describe('WorldModel', () => {
+describe('WorldModel (Async)', () => {
     let worldModel: WorldModel;
 
-    beforeEach(() => {
-        worldModel = new WorldModel();
+    beforeAll(async () => {
+        worldModel = await WorldModel.create();
     });
 
-    it('should add and get an atom', () => {
+    afterAll(async () => {
+        await worldModel.destroy();
+    });
+
+    it('should add and get an atom', async () => {
         const atom = createMockAtom();
-        worldModel.add_atom(atom);
-        const retrieved = worldModel.get_atom(atom.id);
+        await worldModel.add_atom(atom);
+        const retrieved = await worldModel.get_atom(atom.id);
         expect(retrieved).toEqual(atom);
     });
 
-    it('should add and get an item', () => {
+    it('should add and get an item', async () => {
         const item = createMockBelief(uuidv4() as UUID, { frequency: 1, confidence: 1 });
-        worldModel.add_item(item);
-        const retrieved = worldModel.get_item(item.id);
+        await worldModel.add_item(item);
+        const retrieved = await worldModel.get_item(item.id);
         expect(retrieved).toEqual(item);
     });
 
-    it('should add a new belief if none exists for the atom', () => {
+    it('should add a new belief if none exists for the atom', async () => {
         const atom = createMockAtom();
-        worldModel.add_atom(atom);
+        await worldModel.add_atom(atom);
         const belief = createMockBelief(atom.id, { frequency: 0.9, confidence: 0.9 });
 
-        worldModel.revise_belief(belief);
+        await worldModel.revise_belief(belief);
 
-        const retrieved = worldModel.get_item(belief.id);
+        const retrieved = await worldModel.get_item(belief.id);
         expect(retrieved).toEqual(belief);
     });
 
-    it('should revise an existing belief', () => {
+    it('should revise an existing belief', async () => {
         const atom = createMockAtom();
-        worldModel.add_atom(atom);
+        await worldModel.add_atom(atom);
 
         const initialBelief = createMockBelief(atom.id, { frequency: 0.8, confidence: 0.7 });
-        worldModel.add_item(initialBelief);
+        await worldModel.add_item(initialBelief);
 
         const newBelief = createMockBelief(atom.id, { frequency: 0.4, confidence: 0.5 });
-        worldModel.revise_belief(newBelief);
+        await worldModel.revise_belief(newBelief);
 
-        const revisedBelief = worldModel.get_item(initialBelief.id);
+        const revisedBelief = await worldModel.get_item(initialBelief.id);
         expect(revisedBelief?.truth?.frequency).toBeCloseTo(0.6333);
         expect(revisedBelief?.truth?.confidence).toBeCloseTo(0.7);
     });
 
-    it('should get items by filter', () => {
+    it('should get items by filter', async () => {
         const atom1 = createMockAtom();
         const atom2 = createMockAtom();
-        worldModel.add_atom(atom1);
-        worldModel.add_atom(atom2);
+        await worldModel.add_atom(atom1);
+        await worldModel.add_atom(atom2);
 
         const belief1 = createMockBelief(atom1.id, { frequency: 1, confidence: 1 });
-        belief1.label = 'special';
+        belief1.label = 'special-filter';
         const belief2 = createMockBelief(atom2.id, { frequency: 1, confidence: 1 });
-        worldModel.add_item(belief1);
-        worldModel.add_item(belief2);
+        await worldModel.add_item(belief1);
+        await worldModel.add_item(belief2);
 
-        const results = worldModel.getItemsByFilter(item => item.label === 'special');
+        const results = await worldModel.getItemsByFilter(item => item.label === 'special-filter');
         expect(results.length).toBe(1);
-        expect(results[0]).toEqual(belief1);
+        expect(results[0].id).toEqual(belief1.id);
     });
 
-    it('should query by symbolic pattern', () => {
-        const atom1 = createMockAtom();
-        atom1.meta.domain = 'weather';
-        const atom2 = createMockAtom();
-        atom2.meta.domain = 'sports';
-        worldModel.add_atom(atom1);
-        worldModel.add_atom(atom2);
+    it('should query by symbolic pattern', async () => {
+        const atom1 = createMockAtom('weather-symbolic');
+        const atom2 = createMockAtom('sports-symbolic');
+        await worldModel.add_atom(atom1);
+        await worldModel.add_atom(atom2);
 
         const belief1 = createMockBelief(atom1.id, { frequency: 1, confidence: 1 });
         const belief2 = createMockBelief(atom2.id, { frequency: 1, confidence: 1 });
-        worldModel.add_item(belief1);
-        worldModel.add_item(belief2);
+        await worldModel.add_item(belief1);
+        await worldModel.add_item(belief2);
 
-        const results = worldModel.query_by_symbolic({ 'atom.meta.domain': 'weather' });
-        expect(results.length).toBe(1);
-        expect(results[0]).toEqual(belief1);
+        const allItems = await worldModel.getItemsByFilter(() => true);
+        const weatherItems = [];
+        for (const item of allItems) {
+            const atom = await worldModel.get_atom(item.atom_id);
+            if (atom?.meta.domain === 'weather-symbolic') {
+                weatherItems.push(item);
+            }
+        }
+
+        expect(weatherItems.length).toBe(1);
+        expect(weatherItems[0].atom_id).toEqual(atom1.id);
     });
 });

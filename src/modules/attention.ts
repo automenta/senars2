@@ -33,19 +33,27 @@ export class AttentionModule implements IAttentionModule {
         };
     }
 
-    update_on_access(items: CognitiveItem[]): void {
-        items.forEach(item => {
-            item.attention.priority = Math.min(1.0, item.attention.priority + ACCESS_BOOST);
-            item.attention.durability = Math.min(1.0, item.attention.durability + DURABILITY_BOOST);
-        });
+    async update_on_access(items: CognitiveItem[], world_model: WorldModel): Promise<void> {
+        for (const item of items) {
+            const new_priority = Math.min(1.0, item.attention.priority + ACCESS_BOOST);
+            const new_durability = Math.min(1.0, item.attention.durability + DURABILITY_BOOST);
+            await world_model.update_item(item.id, {
+                attention: {
+                    ...item.attention,
+                    priority: new_priority,
+                    durability: new_durability
+                }
+            });
+        }
     }
 
-    run_decay_cycle(world_model: WorldModel, agenda: Agenda): void {
+    async run_decay_cycle(world_model: WorldModel, agenda: Agenda): Promise<void> {
         console.log("AttentionModule: Running attention decay cycle...");
         let decayedItems = 0;
 
         // Decay items in the WorldModel
-        world_model.getItemsByFilter(_ => true).forEach(item => {
+        const allItems = await world_model.getItemsByFilter(_ => true);
+        allItems.forEach(item => {
             // Priority decays faster than durability
             item.attention.priority *= DECAY_FACTOR;
             item.attention.durability *= (DECAY_FACTOR + 0.01); // Durability decays slower

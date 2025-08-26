@@ -5,9 +5,9 @@ import { createAtomId } from '../lib/utils';
 
 
 // Helper to create a new goal item and its underlying atom
-function createSystemGoal(content: any, priority: number): { atom: SemanticAtom, item: CognitiveItem } {
-    const contentStr = JSON.stringify(content);
-    const atomId = uuidv4();
+function createSystemGoal(command: string, params: any, priority: number): { atom: SemanticAtom, item: CognitiveItem } {
+    const content = { command, params };
+    const atomId = createAtomId(content, { type: 'Fact', source: 'system_reflection' });
 
     const atom: SemanticAtom = {
         id: atomId,
@@ -77,34 +77,36 @@ export class ReflectionLoop {
         console.log("Reflection loop stopped.");
     }
 
-    private run_cycle() {
+    private async run_cycle() {
         console.log("ReflectionLoop: Running self-audit cycle.");
 
         // 1. Run attention decay
-        this.attentionModule.run_decay_cycle(this.worldModel, this.agenda);
+        // This likely needs to be async as well if it interacts with the world model,
+        // but for now, let's assume it's synchronous.
+        await this.attentionModule.run_decay_cycle(this.worldModel, this.agenda);
 
         // 2. Run other checks
-        this.check_memory_pressure();
-        this.check_contradiction_rate();
+        await this.check_memory_pressure();
+        await this.check_contradiction_rate();
     }
 
-    private check_memory_pressure() {
-        const current_size = this.worldModel.size();
+    private async check_memory_pressure() {
+        const current_size = await this.worldModel.size();
         if (current_size > this.thresholds.memory) {
             console.log(`ReflectionLoop: Memory pressure detected (${current_size} atoms). Pushing compaction goal.`);
-            const { atom, item } = createSystemGoal(['compact', 'memory'], 0.8);
-            this.worldModel.add_atom(atom);
+            const { atom, item } = createSystemGoal('compact_memory', {}, 0.8);
+            await this.worldModel.add_atom(atom);
             this.agenda.push(item);
         }
     }
 
-    private check_contradiction_rate() {
+    private async check_contradiction_rate() {
         // This is a simplified check.
         const simulated_rate = Math.random() * 0.1;
         if (simulated_rate > this.thresholds.contradiction) {
             console.log(`ReflectionLoop: High contradiction rate detected (${simulated_rate.toFixed(2)}). Pushing audit goal.`);
-            const { atom, item } = createSystemGoal(['run', 'belief_audit'], 0.95);
-            this.worldModel.add_atom(atom);
+            const { atom, item } = createSystemGoal('run_belief_audit', { rate: simulated_rate }, 0.95);
+            await this.worldModel.add_atom(atom);
             this.agenda.push(item);
         }
     }

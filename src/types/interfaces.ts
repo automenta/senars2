@@ -6,10 +6,15 @@ import {
     TruthValue
 } from './data';
 
+export type SchemaDerivedData = {
+    items: CognitiveItem[];
+    atoms: SemanticAtom[];
+}
+
 // Forward declaration for CognitiveSchema
 export interface CognitiveSchema {
     atom_id: UUID;
-    apply(a: CognitiveItem, b: CognitiveItem, world_model: WorldModel): CognitiveItem[];
+    apply(a: CognitiveItem, b: CognitiveItem, world_model: WorldModel): SchemaDerivedData;
 }
 
 export interface Agenda {
@@ -28,17 +33,18 @@ export interface BeliefRevisionEngine {
 }
 
 export interface WorldModel {
-    add_atom(atom: SemanticAtom): UUID;
-    add_item(item: CognitiveItem): void;
-    get_atom(id: UUID): SemanticAtom | null;
-    get_item(id: UUID): CognitiveItem | null;
-    query_by_semantic(embedding: number[], k: number): CognitiveItem[];
-    query_by_symbolic(pattern: any, k?: number): CognitiveItem[];
-    query_by_structure(pattern: any, k?: number): CognitiveItem[];
-    revise_belief(new_item: CognitiveItem): CognitiveItem | null;
+    add_atom(atom: SemanticAtom): Promise<UUID>;
+    add_item(item: CognitiveItem): Promise<void>;
+    update_item(id: UUID, patch: Partial<CognitiveItem>): Promise<void>;
+    get_atom(id: UUID): Promise<SemanticAtom | null>;
+    get_item(id: UUID): Promise<CognitiveItem | null>;
+    query_by_semantic(embedding: number[], k: number): Promise<CognitiveItem[]>;
+    query_by_symbolic(pattern: any, k?: number): Promise<CognitiveItem[]>;
+    query_by_structure(pattern: any, k?: number): Promise<CognitiveItem[]>;
+    revise_belief(new_item: CognitiveItem): Promise<CognitiveItem | null>;
     register_schema_atom(atom: SemanticAtom): CognitiveSchema;
-    size(): number;
-    getItemsByFilter(filter: (item: CognitiveItem) => boolean): CognitiveItem[];
+    size(): Promise<number>;
+    getItemsByFilter(filter: (item: CognitiveItem) => boolean): Promise<CognitiveItem[]>;
 }
 
 export interface AttentionModule {
@@ -48,17 +54,17 @@ export interface AttentionModule {
         schema: CognitiveSchema,
         source_trust?: number
     ): AttentionValue;
-    update_on_access(items: CognitiveItem[]): void;
-    run_decay_cycle(world_model: WorldModel, agenda: Agenda): void;
+    update_on_access(items: CognitiveItem[], world_model: WorldModel): Promise<void>;
+    run_decay_cycle(world_model: WorldModel, agenda: Agenda): Promise<void>;
 }
 
 export interface ResonanceModule {
-    find_context(item: CognitiveItem, world_model: WorldModel, k: number): CognitiveItem[];
+    find_context(item: CognitiveItem, world_model: WorldModel, k: number): Promise<CognitiveItem[]>;
 }
 
 export interface SchemaMatcher {
-    register_schema(schema: SemanticAtom, world_model: WorldModel): CognitiveSchema;
-    find_applicable(a: CognitiveItem, b: CognitiveItem, world_model: WorldModel): CognitiveSchema[];
+    register_schema(schema: CognitiveSchema, world_model: WorldModel): CognitiveSchema;
+    find_applicable(a: CognitiveItem, b: CognitiveItem, world_model: WorldModel): Promise<CognitiveSchema[]>;
 }
 
 export interface GoalTreeManager {
@@ -83,6 +89,6 @@ export interface ExecutorResult {
 }
 
 export interface Executor {
-    can_execute(goal: CognitiveItem, world_model: WorldModel): boolean;
+    can_execute(goal: CognitiveItem, world_model: WorldModel): Promise<boolean>;
     execute(goal: CognitiveItem, world_model: WorldModel): Promise<ExecutorResult>;
 }

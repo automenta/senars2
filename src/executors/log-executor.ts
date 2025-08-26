@@ -5,18 +5,18 @@ import { createAtomId } from "../lib/utils";
 
 export class LogExecutor implements Executor {
 
-    private getGoalContent(goal: CognitiveItem, world_model: WorldModel): any | null {
-        const atom = world_model.get_atom(goal.atom_id);
+    private async getGoalContent(goal: CognitiveItem, world_model: WorldModel): Promise<any | null> {
+        const atom = await world_model.get_atom(goal.atom_id);
         return atom?.content ?? null;
     }
 
-    can_execute(goal: CognitiveItem, world_model: WorldModel): boolean {
-        const content = this.getGoalContent(goal, world_model);
+    async can_execute(goal: CognitiveItem, world_model: WorldModel): Promise<boolean> {
+        const content = await this.getGoalContent(goal, world_model);
         return content && typeof content === 'object' && content.command === 'log';
     }
 
     async execute(goal: CognitiveItem, world_model: WorldModel): Promise<ExecutorResult> {
-        const content = this.getGoalContent(goal, world_model);
+        const content = await this.getGoalContent(goal, world_model);
         const message = content?.message ?? 'No message provided.';
 
         console.log(`[LogExecutor] ${message}`);

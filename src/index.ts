@@ -1,6 +1,6 @@
 import { Agenda } from './components/agenda';
 import { WorldModel } from './components/world-model';
-import { CognitiveWorker } from './core/worker';
+import { WorkerPool } from './core/worker-pool';
 import { ReflectionLoop } from './core/reflection';
 import { ActionSubsystem } from './components/action';
 import { PerceptionSubsystem } from './components/perception';
@@ -13,32 +13,29 @@ import { GoalTreeManager } from './modules/goal-tree-manager';
 import { LogExecutor } from './executors/log-executor';
 import { TextTransducer } from './transducers/text-transducer';
 
+import { testTriggerSchema, testTriggerSchemaAtom } from './schemas/test-trigger-schema';
 import { SemanticAtom } from './types/data';
-import { createAtomId } from './lib/utils';
+
+const NUM_WORKERS = 4;
+const TEST_DURATION_MS = 3000; // Run for 3 seconds
 
 async function main() {
     console.log("--- System Initialization ---");
 
-    // 1. Create Core Components
     const agenda = new Agenda();
-    const worldModel = new WorldModel();
-
-    // 2. Create Subsystems
+    const worldModel = await WorldModel.create();
     const actionSubsystem = new ActionSubsystem(worldModel);
     const perceptionSubsystem = new PerceptionSubsystem(worldModel, agenda);
-
-    // 3. Create Cognitive Modules
     const attentionModule = new AttentionModule();
     const resonanceModule = new ResonanceModule();
     const schemaMatcher = new SchemaMatcher();
     const goalTreeManager = new GoalTreeManager();
 
-    // 4. Register Concrete Implementations
     actionSubsystem.register_executor(new LogExecutor());
     perceptionSubsystem.register_transducer(new TextTransducer());
 
-    // 5. Create the Cognitive Worker
-    const worker = new CognitiveWorker(
+    const workerPool = new WorkerPool(
+        NUM_WORKERS,
         agenda,
         worldModel,
         resonanceModule,
@@ -48,74 +45,28 @@ async function main() {
         actionSubsystem
     );
 
-    // 6. Create and start the Reflection Loop
-    const reflectionLoop = new ReflectionLoop(worldModel, agenda, attentionModule, 200); // 200ms interval for test
-    reflectionLoop.start();
-
+    const reflectionLoop = new ReflectionLoop(worldModel, agenda, attentionModule, 1000);
 
     console.log("\n--- Scenario Setup ---");
-
-    // 6. Define and Register a Reasoning Schema
-    const schemaContent = {
-        pattern: {
-            a: { type: 'BELIEF', 'atom.content.text': 'initiate test' }
-        },
-        apply_args: ['ctx'],
-        apply_logic: `
-            const { a, wm, uuidv4, createAtomId } = ctx;
-            const goal_content = { command: 'log', message: 'System test successful' };
-            const goal_meta = {
-                type: "Fact", source: "reasoning:test-schema", timestamp: new Date().toISOString(),
-                author: "system", trust_score: 1.0, domain: "system.test", license: "internal"
-            };
-            const goal_atom = {
-                id: createAtomId(goal_content, goal_meta), content: goal_content, embedding: [], meta: goal_meta
-            };
-            const goal_item = {
-                id: uuidv4(), atom_id: goal_atom.id, type: 'GOAL',
-                attention: { priority: 0.95, durability: 0.8 },
-                stamp: { timestamp: Date.now(), parent_ids: [a.id], schema_id: 'test-schema-atom' },
-                goal_status: 'active', label: "Goal: Log system test message"
-            };
-            wm.add_atom(goal_atom);
-            return [goal_item];
-        `
-    };
-    const schemaAtom: SemanticAtom = {
-        id: 'test-schema-atom' as any, content: schemaContent, embedding: [],
-        meta: {
-            type: 'CognitiveSchema', source: 'system_definition', timestamp: new Date().toISOString(),
-            author: 'system', trust_score: 1.0, domain: 'system.test', license: 'internal',
-            label: 'Test Trigger Schema'
-        }
-    };
-    worldModel.add_atom(schemaAtom);
-    schemaMatcher.register_schema(schemaAtom, worldModel);
-
+    await worldModel.add_atom(testTriggerSchemaAtom);
+    schemaMatcher.register_schema(testTriggerSchema, worldModel);
     console.log("Schema registered. System is ready for controlled execution.");
 
-    // 7. Start the cognitive process by injecting a perception
-    console.log("\n--- Running Scenario (Tick-based) ---");
+    console.log("\n--- Running Scenario (Continuous) ---");
+    workerPool.start();
+    reflectionLoop.start();
+
     perceptionSubsystem.process("initiate test", "user_input");
 
-    // 8. Run the worker until the agenda is empty
-    let max_ticks = 10;
-    while (agenda.size() > 0 && max_ticks > 0) {
-        console.log(`\n[Tick ${11 - max_ticks}] - Agenda size: ${agenda.size()}`);
-        await worker.tick();
-        max_ticks--;
-    }
-    if (max_ticks === 0) {
-        console.warn("Run finished due to reaching max_ticks.");
-    }
+    // Let the system run for a while
+    await new Promise(resolve => setTimeout(resolve, TEST_DURATION_MS));
 
+    console.log("\n--- Stopping System ---");
+    workerPool.stop();
     reflectionLoop.stop();
-    console.log("\n--- Scenario Complete ---");
-    console.log("Final state of Agenda size:", agenda.size());
 
-    // 9. Verify the outcome
     console.log("\n--- Verification ---");
-    const goals = worldModel.getItemsByFilter(item => item.type === 'GOAL');
+    const goals = await worldModel.getItemsByFilter(item => item.type === 'GOAL');
     if (goals.length > 0) {
         const testGoal = goals.find(g => g.label === "Goal: Log system test message");
         if (testGoal) {
@@ -131,6 +82,24 @@ async function main() {
         }
     } else {
         console.error("❌ No goals found in the World Model.");
+    }
+
+    // Semantic search test from previous step
+    console.log("\n--- Semantic Search Test ---");
+    const atom1: SemanticAtom = { id: 'atom1', content: { text: 'cat' }, embedding: [1, 0, 0], meta: { type: 'Fact', source: 'test', timestamp: '', author: '', trust_score: 1, domain: '', license: '' } };
+    const item1: import('./types/data').CognitiveItem = { id: 'item1', atom_id: 'atom1', type: 'BELIEF', attention: { priority: 0.5, durability: 0.5 }, stamp: { timestamp: 0, parent_ids: [], schema_id: '' }, truth: { frequency: 1, confidence: 1 }, label: 'Belief: cat' };
+    const atom2: SemanticAtom = { id: 'atom2', content: { text: 'dog' }, embedding: [0, 1, 0], meta: { type: 'Fact', source: 'test', timestamp: '', author: '', trust_score: 1, domain: '', license: '' } };
+    const item2: import('./types/data').CognitiveItem = { id: 'item2', atom_id: 'atom2', type: 'BELIEF', attention: { priority: 0.5, durability: 0.5 }, stamp: { timestamp: 0, parent_ids: [], schema_id: '' }, truth: { frequency: 1, confidence: 1 }, label: 'Belief: dog' };
+    await worldModel.add_atom(atom1);
+    await worldModel.add_item(item1);
+    await worldModel.add_atom(atom2);
+    await worldModel.add_item(item2);
+    const queryEmbedding = [0.9, 0.1, 0];
+    const searchResults = await worldModel.query_by_semantic(queryEmbedding, 1);
+    if (searchResults.length > 0 && searchResults[0].id === 'item1') {
+        console.log(`✅ Semantic search returned the correct item: ${searchResults[0].label}`);
+    } else {
+        console.error("❌ Semantic search failed. Expected 'item1', got:", searchResults);
     }
 }
 
