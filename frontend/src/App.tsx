@@ -2,16 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import './App.css';
 import EventLog from './EventLog';
+import { CognitiveItem } from './types';
 
 type Goal = {
   id: string;
   label: string;
   status: string;
-};
-
-type Event = {
-  timestamp: string;
-  data: string;
 };
 
 type ConnectionStatusType = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
@@ -33,7 +29,7 @@ const ConnectionStatus: React.FC<{ status: ConnectionStatusType }> = ({ status }
 
 function App() {
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
+  const [items, setItems] = useState<CognitiveItem[]>([]);
   const [newGoal, setNewGoal] = useState('');
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('disconnected');
   const ws = useRef<WebSocket | null>(null);
@@ -65,14 +61,17 @@ function App() {
     };
 
     websocket.onmessage = (event) => {
-      const newEvent: Event = {
-        timestamp: new Date().toLocaleTimeString(),
-        data: event.data,
-      };
-      setEvents(prevEvents => [...prevEvents, newEvent]);
-
       console.log('WebSocket message received:', event.data);
-      const message = JSON.parse(event.data);
+      try {
+        const message = JSON.parse(event.data);
+
+        // All messages are treated as cognitive items and added to the stream
+        // This is a simplification for now. In a real app, we might have
+        // different message types (e.g., control messages vs. data messages).
+        if (message.id && message.type && message.atom_id) {
+           const newItem: CognitiveItem = { ...message, raw_data: event.data };
+           setItems(prevItems => [...prevItems, newItem]);
+        }
 
       // Handle direct responses from requests
       if (message.status === 'success') {
@@ -84,30 +83,25 @@ function App() {
         return;
       }
 
-      // Handle broadcasted events
-      switch (message.type) {
-        case 'item_added':
-          if (message.data && message.data.type === 'GOAL' && message.data.label) {
-            setGoals(prevGoals => {
-              if (prevGoals.find(g => g.id === message.data.id)) {
-                return prevGoals;
-              }
-              const newGoal: Goal = { id: message.data.id, label: message.data.label, status: message.data.goal_status };
-              return [...prevGoals, newGoal];
-            });
-          }
-          break;
-        case 'item_updated':
-          if (message.data && message.data.type === 'GOAL') {
-            setGoals(prevGoals =>
-              prevGoals.map(g =>
-                g.id === message.data.id ? { ...g, status: message.data.goal_status } : g
-              )
-            );
-          }
-          break;
-        default:
-          break;
+        // Handle broadcasted events for the goal list
+        if (message.type === 'item_added' && message.data?.type === 'GOAL' && message.data?.label) {
+          setGoals(prevGoals => {
+            if (prevGoals.find(g => g.id === message.data.id)) {
+              return prevGoals;
+            }
+            const newGoalToAdd: Goal = { id: message.data.id, label: message.data.label, status: message.data.goal_status };
+            return [...prevGoals, newGoalToAdd];
+          });
+        } else if (message.type === 'item_updated' && message.data?.type === 'GOAL') {
+          setGoals(prevGoals =>
+            prevGoals.map(g =>
+              g.id === message.data.id ? { ...g, status: message.data.goal_status } : g
+            )
+          );
+        }
+
+      } catch (error) {
+        console.error("Failed to parse WebSocket message:", error);
       }
     };
 
@@ -165,7 +159,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Cognitive Agent TODO List</h1>
+        <h1>Cognitive Agent Workspace</h1>
         <ConnectionStatus status={connectionStatus} />
       </header>
       <main>
@@ -189,7 +183,7 @@ function App() {
           />
           <button type="submit">Add Goal</button>
         </form>
-        <EventLog events={events} />
+        <EventLog items={items} />
       </main>
     </div>
   );

@@ -13,6 +13,41 @@ export class WebSocketTransducer implements Transducer {
 
         const { type, payload, clientId, requestId } = data;
 
+        // Special hook for end-to-end testing
+        if (type === 'INITIATE_TEST') {
+            const test_atom_content = { text: 'initiate test' };
+            const test_atom_meta = {
+                type: "Observation" as const,
+                source: "test_client",
+                timestamp: new Date().toISOString(),
+                author: "system" as const,
+                trust_score: 1.0,
+                domain: "system.test",
+                license: "internal"
+            };
+            const test_atom_id = createAtomId(test_atom_content, test_atom_meta);
+            const test_atom: SemanticAtom = {
+                id: test_atom_id,
+                content: test_atom_content,
+                embedding: [],
+                meta: test_atom_meta
+            };
+            const test_item: CognitiveItem = {
+                id: uuidv4(),
+                atom_id: test_atom.id,
+                type: 'BELIEF',
+                truth: { frequency: 1.0, confidence: 1.0 },
+                attention: { priority: 1.0, durability: 1.0 },
+                stamp: {
+                    timestamp: Date.now(),
+                    parent_ids: [],
+                    schema_id: 'transducer:websocket:test' as any,
+                },
+                label: `Test Trigger Belief`
+            };
+            return { atom: test_atom, item: test_item };
+        }
+
         // The content of the atom represents the request in a structured way for schema matching
         const atom_content = {
             type: "websocket_request",

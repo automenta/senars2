@@ -1,0 +1,75 @@
+.cognitive-item-card {
+    background-color: #282c34;
+    border: 1px solid #444;
+    border-left-width: 5px;
+    border-radius: 5px;
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #f0f0f0;
+    font-size: 14px;
+}
+
+/* Type-specific border colors */
+.cognitive-item-card.type-belief {
+    border-left-color: #059669; /* Emerald */
+}
+
+.cognitive-item-card.type-goal {
+    border-left-color: #2563EB; /* Deep Blue */
+}
+
+.cognitive-item-card.type-query {
+    border-left-color: #D97706; /* Amber */
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.item-icon {
+    font-size: 18px;
+    margin-right: 8px;
+}
+
+.item-type {
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    background-color: #3e4450;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.goal-status {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+.status-active { background-color: #2563EB; color: white; }
+.status-achieved { background-color: #059669; color: white; }
+.status-failed { background-color: #DC2626; color: white; }
+.status-blocked { background-color: #D97706; color: white; }
+
+
+.card-body .item-label {
+    margin: 0;
+    font-size: 1em;
+    line-height: 1.4;
+}
+
+.card-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: #9e9e9e;
+    font-family: 'Courier New', Courier, monospace;
+}

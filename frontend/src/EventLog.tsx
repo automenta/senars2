@@ -1,34 +1,29 @@
 import React, { useEffect, useRef } from 'react';
+import { CognitiveItem } from './types';
+import CognitiveItemCard from './CognitiveItemCard';
 import './EventLog.css';
 
-type Event = {
-  timestamp: string;
-  data: string;
-};
-
 type EventLogProps = {
-  events: Event[];
+  items: CognitiveItem[];
 };
 
-const EventLog: React.FC<EventLogProps> = ({ events }) => {
+const EventLog: React.FC<EventLogProps> = ({ items }) => {
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
-  }, [events]);
+  }, [items]);
 
   return (
     <div className="event-log-container">
-      <h3>Agent Event Stream</h3>
+      <h3>Cognitive Item Stream</h3>
       <div className="event-log" ref={logContainerRef}>
-        {events.map((event, index) => (
-          <div key={index} className="event-item">
-            <span className="event-timestamp">{event.timestamp}</span>
-            <pre className="event-data">{event.data}</pre>
-          </div>
+        {items.map((item) => (
+          <CognitiveItemCard key={item.id} item={item} />
         ))}
+        {items.length === 0 && <p>No items to display yet. Waiting for server...</p>}
       </div>
     </div>
   );
