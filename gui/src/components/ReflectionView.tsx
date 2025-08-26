@@ -1,7 +1,9 @@
 import React from 'react';
 import { useReflectionData } from '../hooks/useReflectionData';
 
+// This component displays metacognitive data about the agent's performance.
 function ReflectionView() {
+  // The useReflectionData hook handles fetching the data periodically.
   const { data, isLoading, error } = useReflectionData();
 
   if (isLoading) {

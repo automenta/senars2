@@ -1,38 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { CognitiveItem, AppState, GoalTree } from '../types';
+import React, { useState, useMemo } from 'react';
+import { CognitiveItem, GoalTree, SemanticAtom } from '../types';
 import { TargetIcon, CheckIcon, WarningIcon, XIcon, SearchIcon } from './Icons';
 
-function AgendaView() {
-  const [agendaItems, setAgendaItems] = useState<CognitiveItem[]>([]);
-  const [goalTree, setGoalTree] = useState<GoalTree>({});
+interface AgendaViewProps {
+  agendaItems: CognitiveItem[];
+  goalTree: GoalTree;
+  worldModel: SemanticAtom[];
+  onNewGoalClick: () => void;
+}
+
+function AgendaView({ agendaItems, goalTree, worldModel, onNewGoalClick }: AgendaViewProps) {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [goalType, setGoalType] = useState('Diagnose condition');
-  const [contextText, setContextText] = useState('');
   const [filterPriority, setFilterPriority] = useState('all');
   const [filterDomain, setFilterDomain] = useState('all');
   const [filterTrust, setFilterTrust] = useState(0);
-  const [detectedEntities, setDetectedEntities] = useState<string[]>([]);
-  const [suggestedGoal, setSuggestedGoal] = useState('');
-  const [priority, setPriority] = useState(0.5);
-  const [factors, setFactors] = useState<string[]>([]);
-  const [worldModel, setWorldModel] = useState<SemanticAtom[]>([]);
 
-  const filteredAgendaItems = React.useMemo(() => {
+  const filteredAgendaItems = useMemo(() => {
     return agendaItems.filter(item => {
-      // Priority filter
       if (filterPriority !== 'all') {
         if (filterPriority === 'high' && item.attention.priority < 0.7) return false;
         if (filterPriority === 'low' && item.attention.priority >= 0.3) return false;
       }
 
-      // Trust filter
       const atom = worldModel.find(a => a.id === item.atom_id);
       const trustScore = atom?.meta.trust_score ?? item.truth?.confidence ?? 0.5;
       if (trustScore < filterTrust) {
         return false;
       }
 
-      // Domain filter
       if (filterDomain !== 'all') {
         if (!atom?.meta.domain || atom.meta.domain !== filterDomain) return false;
       }
@@ -40,94 +35,6 @@ function AgendaView() {
       return true;
     });
   }, [agendaItems, filterPriority, filterDomain, filterTrust, worldModel]);
-
-  useEffect(() => {
-    const ws = new WebSocket('ws://localhost:3001');
-
-    ws.onopen = () => {
-      console.log('Connected to WebSocket server');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data: AppState = JSON.parse(event.data);
-        setAgendaItems(data.agenda || []);
-        setGoalTree(data.goalTree || {});
-        setWorldModel(data.worldModel || []);
-      } catch (error) {
-        console.error("Failed to parse WebSocket message:", error);
-      }
-    };
-
-    ws.onclose = () => {
-      console.log('Disconnected from WebSocket server');
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!suggestedGoal.trim()) return;
-    
-    try {
-      const response = await fetch('http://localhost:3001/api/input', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ data: `GOAL: ${suggestedGoal}` }),
-      });
-      
-      if (response.ok) {
-        setContextText('');
-        setDetectedEntities([]);
-        setSuggestedGoal('');
-      } else {
-        console.error('Failed to submit input');
-      }
-    } catch (error) {
-      console.error('Error submitting input:', error);
-    }
-  };
-
-  useEffect(() => {
-    if (!contextText.trim()) {
-      setSuggestedGoal('');
-      setDetectedEntities([]);
-      setPriority(0.5);
-      setFactors([]);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      try {
-        const response = await fetch('http://localhost:3001/api/compose-goal', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: contextText }),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setSuggestedGoal(data.suggestedGoal);
-          setDetectedEntities(data.detectedEntities);
-          setPriority(data.priority);
-          setFactors(data.factors);
-        }
-      } catch (error) {
-        console.error('Error composing goal:', error);
-      }
-    }, 500); // Debounce API call
-
-    return () => clearTimeout(timer);
-  }, [contextText]);
 
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expandedItems);
@@ -208,7 +115,6 @@ function AgendaView() {
     return (
       <div className="sub-goals-container">
         {parentNode.children.map(childId => {
-          // The full sub-goal item should be in the agendaItems list
           const subGoal = agendaItems.find(item => item.id === childId);
           if (!subGoal) {
             return (
@@ -229,8 +135,6 @@ function AgendaView() {
               {expandedItems.has(subGoal.id) && (
                 <div className="sub-goal-details">
                   <p>Status: {subGoal.goal_status || 'active'}</p>
-                  {subGoal.goal_status === 'blocked' && <p>Dependencies: [Blocked by other goals]</p>}
-                  {subGoal.goal_status === 'active' && <p>Dependencies: [Waiting for execution]</p>}
                 </div>
               )}
             </div>
@@ -241,82 +145,9 @@ function AgendaView() {
   };
 
   return (
-    <div className="agenda-view">
-      <form onSubmit={handleSubmit} className="input-section-new">
-        <h3>[+] New Goal</h3>
-
-        <div className="form-row">
-          <label>Goal Type:</label>
-          <div className="goal-type-selector">
-            {['Diagnose condition', 'Verify fact', 'Generate hypothesis', 'System maintenance'].map(type => (
-              <button
-                key={type}
-                type="button"
-                className={`goal-type-button ${goalType === type ? 'active' : ''}`}
-                onClick={() => setGoalType(type)}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="form-row">
-          <label htmlFor="context-input">Context:</label>
-          <textarea
-            id="context-input"
-            value={contextText}
-            onChange={(e) => setContextText(e.target.value)}
-            placeholder="e.g., My cat seems sick after eating chocolate"
-            rows={3}
-          />
-        </div>
-
-        <div className="intelligent-composition">
-            <div className="detected-entities">
-                Detected entities:
-                {detectedEntities.length > 0
-                    ? detectedEntities.map(e => <span key={e} className="entity-tag">{e}</span>)
-                    : <span className="placeholder">None</span>
-                }
-            </div>
-            <div className="suggested-goal">
-                → Suggested goal:
-                <input
-                    type="text"
-                    value={suggestedGoal}
-                    onChange={(e) => setSuggestedGoal(e.target.value)}
-                    placeholder="Type context to generate a goal..."
-                />
-            </div>
-        </div>
-
-        <div className="form-row">
-            <label>Priority:</label>
-            <div className="priority-display">
-                Automatically calculated: <span className="priority-value">[{priority.toFixed(2)}]</span>
-                <span className="priority-factors">({factors.length > 0 ? factors.join(', ') : 'Base priority'})</span>
-            </div>
-        </div>
-
-        <div className="form-row">
-            <label>Trust Requirements:</label>
-            <div className="trust-requirements">
-              <span className="trust-badge high">vetdb.org • 0.95</span>
-              <span className="trust-badge medium">Peer-reviewed • 0.85</span>
-              <span className="trust-badge low">User • 0.60</span>
-            </div>
-        </div>
-
-        <div className="form-actions">
-            <button type="submit" className="submit-button">Create Goal</button>
-            <button type="button" className="secondary-button">Save as Template</button>
-            <button type="button" className="tertiary-button">Cancel</button>
-        </div>
-      </form>
-
+    <div className="view-container agenda-view">
       <div className="toolbar">
-        <button className="primary-button">[+] New Goal</button>
+        <button className="primary-button" onClick={onNewGoalClick}>[+] New Goal</button>
         <div className="filters">
           <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
             <option value="all">All Priorities</option>
@@ -425,13 +256,6 @@ function AgendaView() {
             );
           })
         )}
-      </div>
-      
-      <div className="agenda-footer">
-        <button>[▼ 23 more items]</button>
-        <button>🔄 Refresh</button>
-        <button>📊 Visualize</button>
-        <button>🧪 Sandbox</button>
       </div>
     </div>
   );

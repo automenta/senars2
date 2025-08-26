@@ -74,7 +74,9 @@ export class TextTransducer implements Transducer {
     const confidence = explicitMeta.confidence ?? (itemType === 'BELIEF' ? 0.6 : undefined);
     const schema_id = explicitMeta.schema_id ?? ('user-input-schema' as UUID);
 
-    const label = itemContent.substring(0, 70) + (itemContent.length > 70 ? '...' : '');
+    const label = (itemType === 'GOAL')
+      ? itemContent
+      : itemContent.substring(0, 70) + (itemContent.length > 70 ? '...' : '');
 
     const partialItem: PartialCognitiveItem = {
       atom_id: atom.id,

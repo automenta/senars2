@@ -26,7 +26,7 @@ function SettingsView() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Settings saved:', settings);
-    // In a real app, you would send these settings to the backend
+    // TODO: In a real app, you would send these settings to the backend.
   };
 
   return (

@@ -11,14 +11,19 @@ const mockReplace = jest.fn<() => Promise<string>>();
 (global as any).read_file = mockReadFile;
 (global as any).replace_with_git_merge_diff = mockReplace;
 
+import { AttentionModuleImpl } from './modules/attention.js';
+
 describe('E2E Self-Development Task', () => {
   let core: CognitiveCore;
   let agenda: AgendaImpl;
   let worldModel: WorldModelImpl;
+  let textTransducer: TextTransducer;
 
   beforeEach(async () => {
     agenda = new AgendaImpl();
     worldModel = new WorldModelImpl();
+    const attentionModule = new AttentionModuleImpl();
+    textTransducer = new TextTransducer(worldModel, attentionModule);
     core = new CognitiveCore(agenda, worldModel);
     await core.initialize(); // This registers system schemas
 
@@ -101,10 +106,8 @@ describe('E2E Self-Development Task', () => {
     expect(mockReadFile).toHaveBeenCalledWith('gui/src/components/ReflectionView.tsx');
 
     // 7. Now, assume the replace_in_file goal is on the agenda and execute it
-    agenda.remove(replaceFileGoal!.id); // Remove the original placeholder
-    const replaceActionGoal = (await textTransducer.process(replaceFileGoal!.label!))[0];
-
-    await actionSubsystem.executeGoal(replaceActionGoal);
+    // The goal is already a valid CognitiveItem, no need to re-process it.
+    await actionSubsystem.executeGoal(replaceFileGoal!);
 
     // 8. Verify the replace action was called with the correct parameters
     const expectedSearch = 'const healthScore = 100 - (kpis.memoryUtilization / 2) - (kpis.contradictionRate * 50);';

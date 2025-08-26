@@ -29,9 +29,9 @@ const NewGoalForm: React.FC<NewGoalFormProps> = ({ onClose }) => {
       setComposition(data);
     } catch (err) {
       console.error('Failed to fetch goal composition:', err);
-      // Not showing this error to the user as it's a background process
+      // Not showing this error to the user as it's a background process, not a critical failure.
     }
-  }, 500), []); // 500ms debounce delay
+  }, 500), []); // 500ms debounce delay to avoid spamming the API while typing.
 
   useEffect(() => {
     fetchComposition(goalText);
