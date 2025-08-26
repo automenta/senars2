@@ -1,4 +1,5 @@
 import { WorldModel } from '../src/components/world-model';
+import { EventBus } from '../src/core/event-bus';
 import { SemanticAtom, CognitiveItem, UUID, TruthValue } from '../src/types/data';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -33,9 +34,11 @@ const createMockBelief = (atom_id: UUID, truth: TruthValue): CognitiveItem => ({
 
 describe('WorldModel (Async)', () => {
     let worldModel: WorldModel;
+    let eventBus: EventBus;
 
     beforeAll(async () => {
-        worldModel = await WorldModel.create();
+        eventBus = new EventBus();
+        worldModel = await WorldModel.create(eventBus);
     });
 
     afterAll(async () => {

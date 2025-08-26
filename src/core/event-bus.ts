@@ -10,7 +10,9 @@ export class EventBus {
     private eventSubject = new Subject<Event>();
 
     public publish(type: string, payload: any) {
-        console.log(`[EventBus] Publishing event: ${type}`);
+        if (process.env.NODE_ENV !== 'test') {
+            console.log(`[EventBus] Publishing event: ${type}`);
+        }
         this.eventSubject.next({ type, payload });
     }
 

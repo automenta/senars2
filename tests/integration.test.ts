@@ -1,5 +1,6 @@
 import { Agenda } from '../src/components/agenda';
 import { WorldModel } from '../src/components/world-model';
+import { EventBus } from '../src/core/event-bus';
 import { CognitiveWorker } from '../src/core/worker';
 import { ActionSubsystem } from '../src/components/action';
 import { PerceptionSubsystem } from '../src/components/perception';
@@ -21,11 +22,13 @@ describe("Cognitive Architecture Integration Test", () => {
     let perceptionSubsystem: PerceptionSubsystem;
     let schemaMatcher: SchemaMatcher;
     let worker: CognitiveWorker;
+    let eventBus: EventBus;
 
     beforeEach(async () => {
         // --- Full system setup ---
+        eventBus = new EventBus();
         agenda = new Agenda();
-        worldModel = await WorldModel.create();
+        worldModel = await WorldModel.create(eventBus);
 
         actionSubsystem = new ActionSubsystem(worldModel);
         actionSubsystem.register_executor(new LogExecutor());
