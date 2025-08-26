@@ -31,10 +31,34 @@ export class BeliefRevisionEngine implements IBeliefRevisionEngine {
     }
 }
 
+// Helper functions for querying
+function cosineSimilarity(vecA: number[], vecB: number[]): number {
+    if (vecA.length !== vecB.length || vecA.length === 0) {
+        return 0;
+    }
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+    if (normA === 0 || normB === 0) {
+        return 0;
+    }
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+function getProperty(obj: any, path: string): any {
+    return path.split('.').reduce((o, key) => (o && o[key] !== undefined ? o[key] : undefined), obj);
+}
+
 export class WorldModel implements IWorldModel {
     private atoms = new Map<UUID, SemanticAtom>();
     private items = new Map<UUID, CognitiveItem>();
     private beliefRevisionEngine = new BeliefRevisionEngine();
+    private belief_by_atom_id = new Map<UUID, UUID>(); // Index for faster belief revision
 
     add_atom(atom: SemanticAtom): UUID {
         this.atoms.set(atom.id, atom);
@@ -43,6 +67,9 @@ export class WorldModel implements IWorldModel {
 
     add_item(item: CognitiveItem): void {
         this.items.set(item.id, item);
+        if (item.type === 'BELIEF') {
+            this.belief_by_atom_id.set(item.atom_id, item.id);
+        }
     }
 
     get_atom(id: UUID): SemanticAtom | null {
@@ -54,21 +81,51 @@ export class WorldModel implements IWorldModel {
     }
 
     query_by_semantic(embedding: number[], k: number): CognitiveItem[] {
-        // Semantic search not implemented in this version
-        console.warn("Semantic search not implemented.");
-        return [];
+        const scoredItems = Array.from(this.items.values()).map(item => {
+            const atom = this.get_atom(item.atom_id);
+            if (!atom || !atom.embedding || atom.embedding.length === 0) {
+                return { item, score: -1 };
+            }
+            const score = cosineSimilarity(embedding, atom.embedding);
+            return { item, score };
+        });
+
+        scoredItems.sort((a, b) => b.score - a.score);
+
+        return scoredItems.slice(0, k).map(si => si.item);
     }
 
     query_by_symbolic(pattern: any, k?: number): CognitiveItem[] {
-        // Symbolic search not implemented in this version
-        console.warn("Symbolic search not implemented.");
-        return [];
+        const results: CognitiveItem[] = [];
+        for (const item of this.items.values()) {
+            const atom = this.get_atom(item.atom_id);
+            if (!atom) continue;
+
+            let isMatch = true;
+            for (const key in pattern) {
+                const expectedValue = pattern[key];
+                // Support checks on the item itself or its atom
+                const actualValue = getProperty({item, atom}, key);
+                if (actualValue !== expectedValue) {
+                    isMatch = false;
+                    break;
+                }
+            }
+
+            if (isMatch) {
+                results.push(item);
+                if (k && results.length >= k) {
+                    break;
+                }
+            }
+        }
+        return results;
     }
 
     query_by_structure(pattern: any, k?: number): CognitiveItem[] {
-        // Structure search not implemented in this version
-        console.warn("Structure search not implemented.");
-        return [];
+        // For now, this is an alias for symbolic search. A more advanced
+        // implementation could handle complex graph or S-expression patterns.
+        return this.query_by_symbolic(pattern, k);
     }
 
     revise_belief(new_item: CognitiveItem): CognitiveItem | null {
@@ -76,23 +133,27 @@ export class WorldModel implements IWorldModel {
             return null;
         }
 
-        const existing_item = Array.from(this.items.values()).find(
-            item => item.atom_id === new_item.atom_id && item.type === 'BELIEF'
-        );
+        const existing_item_id = this.belief_by_atom_id.get(new_item.atom_id);
+        const existing_item = existing_item_id ? this.items.get(existing_item_id) : undefined;
 
         if (existing_item && existing_item.truth) {
             if (this.beliefRevisionEngine.detect_conflict(existing_item.truth, new_item.truth)) {
-                // For now, just log conflict. A real implementation might create a GOAL to resolve it.
-                console.warn(`Conflict detected for atom ${new_item.atom_id}`);
+                // In a real system, this might create a GOAL to resolve the conflict.
+                console.warn(`Conflict detected for atom ${new_item.atom_id}. Merging truth values.`);
             }
             const newTruth = this.beliefRevisionEngine.merge(existing_item.truth, new_item.truth);
             existing_item.truth = newTruth;
-            // Optionally, return a new item representing the revision act
+            // The existing item is updated in place.
             return null;
         } else {
+            // This is a new belief, so we add and index it.
             this.add_item(new_item);
         }
         return null;
+    }
+
+    size(): number {
+        return this.atoms.size;
     }
 
     register_schema_atom(atom: SemanticAtom): CognitiveSchema {

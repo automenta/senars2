@@ -36,6 +36,7 @@ export interface WorldModel {
     query_by_structure(pattern: any, k?: number): CognitiveItem[];
     revise_belief(new_item: CognitiveItem): CognitiveItem | null;
     register_schema_atom(atom: SemanticAtom): CognitiveSchema;
+    size(): number;
 }
 
 export interface AttentionModule {
@@ -59,10 +60,10 @@ export interface SchemaMatcher {
 }
 
 export interface GoalTreeManager {
-    decompose(goal: CognitiveItem): CognitiveItem[];
-    mark_achieved(goal_id: UUID): void;
-    mark_failed(goal_id: UUID): void;
-    get_ancestors(goal_id: UUID): UUID[];
+    decompose(goal: CognitiveItem, world_model: WorldModel): CognitiveItem[];
+    mark_achieved(goal_id: UUID, world_model: WorldModel): Promise<void>;
+    mark_failed(goal_id: UUID, world_model: WorldModel): Promise<void>;
+    get_ancestors(goal_id: UUID, world_model: WorldModel): Promise<UUID[]>;
 }
 
 export interface Transducer {

@@ -31,7 +31,7 @@ export class CognitiveWorker {
         console.log("Cognitive worker stopped.");
     }
 
-    private async cognitive_cycle(): Promise<void> {
+    public async cognitive_cycle(): Promise<void> {
         const itemA = await this.agenda.pop();
         if (!this.running) return;
 
@@ -62,6 +62,18 @@ export class CognitiveWorker {
                             schema_id: schema.atom_id,
                         };
 
+                        // Enhance data for goal items
+                        if (newItem.type === 'GOAL') {
+                            // If a goal creates another goal, establish parent-child relationship
+                            if (itemA.type === 'GOAL') {
+                                newItem.goal_parent_id = itemA.id;
+                            }
+                            // Set default status for new goals
+                            if (!newItem.goal_status) {
+                                newItem.goal_status = 'active';
+                            }
+                        }
+
                         this.agenda.push(newItem);
                         console.log(`Derived new item: ${newItem.id} (${newItem.type})`);
                     }
@@ -84,7 +96,7 @@ export class CognitiveWorker {
 
         // 5. Update goal tree
         if (itemA.type === "GOAL" && itemA.goal_status === "achieved") { // Assuming status is set elsewhere
-            this.goalTreeManager.mark_achieved(itemA.id);
+            await this.goalTreeManager.mark_achieved(itemA.id, this.worldModel);
         }
     }
 }
