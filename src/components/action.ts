@@ -20,7 +20,7 @@ export class ActionSubsystem {
         return null;
     }
 
-    async execute_goal(goal: CognitiveItem): Promise<CognitiveItem | null> {
+    async execute_goal(goal: CognitiveItem): Promise<ExecutorResult | null> {
         if (goal.type !== 'GOAL') {
             return null;
         }
@@ -28,7 +28,6 @@ export class ActionSubsystem {
         const executor = await this.find_executor(goal);
 
         if (!executor) {
-            // It's normal for some goals not to have an executor (e.g., abstract goals)
             return null;
         }
 
@@ -36,16 +35,12 @@ export class ActionSubsystem {
             console.log(`ActionSubsystem: Executing goal ${goal.label ?? goal.id} with ${executor.constructor.name}`);
             const result = await executor.execute(goal, this.worldModel);
 
-            // Add the new atom from the action's result to the world model
-            await this.worldModel.add_atom(result.atom);
-
             // Mark the original goal as achieved
             await this.worldModel.update_item(goal.id, { goal_status: 'achieved' });
-
             console.log(`ActionSubsystem: Goal ${goal.label ?? goal.id} executed successfully.`);
 
-            // Return the belief about the action's success to be added to the agenda
-            return result.belief;
+            // Return the full result to the worker for orchestration
+            return result;
         } catch (error) {
             console.error(`ActionSubsystem: Executor ${executor.constructor.name} failed for goal ${goal.label ?? goal.id}`, error);
             // Mark the goal as failed

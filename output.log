@@ -36,14 +36,14 @@ ActionSubsystem: Goal Goal: Log system test message executed successfully.
 ReflectionLoop: Running self-audit cycle.
 AttentionModule: Running attention decay cycle...
 AttentionModule: Decayed attention for 3 items.
+ReflectionLoop: High contradiction rate detected (0.07). Pushing audit goal.
+ReflectionLoop: Running self-audit cycle.
+AttentionModule: Running attention decay cycle...
+AttentionModule: Decayed attention for 3 items.
+ReflectionLoop: Running self-audit cycle.
+AttentionModule: Running attention decay cycle...
+AttentionModule: Decayed attention for 3 items.
 ReflectionLoop: High contradiction rate detected (0.08). Pushing audit goal.
-ReflectionLoop: Running self-audit cycle.
-AttentionModule: Running attention decay cycle...
-AttentionModule: Decayed attention for 3 items.
-ReflectionLoop: High contradiction rate detected (0.09). Pushing audit goal.
-ReflectionLoop: Running self-audit cycle.
-AttentionModule: Running attention decay cycle...
-AttentionModule: Decayed attention for 3 items.
 
 --- Stopping System ---
 Stopping all workers in the pool...
