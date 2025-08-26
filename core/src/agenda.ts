@@ -158,29 +158,34 @@ export class AgendaImpl extends EventEmitter implements Agenda {
   }
 
   push(item: CognitiveItem): void {
+    // If there's a waiting pop, resolve it directly without adding to the queue
     if (this.waitingResolvers.length > 0) {
       const resolver = this.waitingResolvers.shift();
       if (resolver) {
+        // This item is immediately consumed, so it's not 'added' to the agenda from an observer's perspective.
+        // The 'item_removed' event will be handled by the pop() that initiated this.
         resolver(item);
-        this.emit('item_added', item);
         return;
       }
     }
+    // Otherwise, add the item to the queue and notify listeners.
     this.queue.push(item);
     this.emit('item_added', item);
   }
 
   async pop(): Promise<CognitiveItem> {
     const item = this.queue.pop();
+
     if (item) {
-      this.emit('item_removed', { id: item.id });
+      this.emit('item_removed', item); // Emit the full item
       return Promise.resolve(item);
     }
-    // If no item is available, add a resolver to the waiting list.
+
+    // If no item is available, wait for one to be pushed.
     return new Promise((resolve) => {
-      this.waitingResolvers.push((item) => {
-        this.emit('item_removed', { id: item.id });
-        resolve(item)
+      this.waitingResolvers.push((newItem) => {
+        this.emit('item_removed', newItem); // The newly pushed item is immediately removed
+        resolve(newItem);
       });
     });
   }
@@ -194,19 +199,22 @@ export class AgendaImpl extends EventEmitter implements Agenda {
   }
 
   updateAttention(id: UUID, newVal: AttentionValue): void {
+    let updated = false;
     this.queue.update(id, (item) => {
       const updatedItem = { ...item, attention: newVal };
       this.emit('item_updated', updatedItem);
+      updated = true;
       return updatedItem;
     });
   }
 
   remove(id: UUID): boolean {
-    const removed = this.queue.remove(id) !== undefined;
-    if (removed) {
-        this.emit('item_removed', { id });
+    const removedItem = this.queue.remove(id);
+    if (removedItem) {
+        this.emit('item_removed', removedItem); // Emit the full removed item
+        return true;
     }
-    return removed;
+    return false;
   }
 
   getItems(): CognitiveItem[] {

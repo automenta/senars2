@@ -106,44 +106,7 @@ wss.on('connection', (ws) => {
 cognitiveCore.initialize().then(async () => {
   setupEventBroadcasting(agenda, worldModel, goalTreeManager);
   cognitiveCore.start();
-
-  // Add some initial items for demonstration
-  console.log('Adding initial items for demonstration...');
-
-  // Example 1: User input leading to a goal
-  const initialGoalItems = await perception.process(`GOAL: Diagnose cat illness`);
-  if (initialGoalItems.length > 0) {
-    agenda.push(initialGoalItems[0]);
-  }
-
-  // Example 2: A simple belief
-  const factBeliefItems = await perception.process(`BELIEF: (is_toxic_to chocolate dog)`);
-  if (factBeliefItems.length > 0) {
-    // Set higher trust for this belief
-    const updatedFactBelief = factBeliefItems[0];
-    if (updatedFactBelief.truth) {
-        updatedFactBelief.truth.confidence = 0.95;
-    }
-    worldModel.update_atom(updatedFactBelief.atom_id, {
-        trust_score: 0.95,
-        source: 'vetdb.org'
-    });
-    agenda.push(updatedFactBelief);
-  }
-
-  // Add cooking domain data
-  worldModel.add_atom(RECIPE_SUGGESTION_SCHEMA_ATOM);
-
-  const ingredient1Items = await perception.process(`BELIEF: (ingredient_available chicken)`);
-  if (ingredient1Items.length > 0) {
-    agenda.push(ingredient1Items[0]);
-  }
-  const ingredient2Items = await perception.process(`BELIEF: (ingredient_available rice)`);
-  if (ingredient2Items.length > 0) {
-    agenda.push(ingredient2Items[0]);
-  }
-
-  console.log('Initial items added to Agenda.');
+  console.log('Cognitive core started. Listening for API requests and WebSocket connections.');
 });
 
 

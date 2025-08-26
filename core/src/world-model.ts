@@ -162,11 +162,14 @@ export class WorldModelImpl extends EventEmitter implements WorldModel {
     // 5. Remove associated items
     const itemIds = this.atomIdToItemIds.get(id);
     if (itemIds) {
-        for (const itemId of itemIds) {
-            this.items.delete(itemId);
-            this.emit('item_removed', { id: itemId, atom_id: id });
+      for (const itemId of itemIds) {
+        const item = this.items.get(itemId);
+        if (item) {
+          this.items.delete(itemId);
+          this.emit('item_removed', item); // Emit the full item that was removed
         }
-        this.atomIdToItemIds.delete(id);
+      }
+      this.atomIdToItemIds.delete(id);
     }
 
     this.emit('atom_removed', atom);
