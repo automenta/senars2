@@ -1,181 +1,127 @@
 import { Agenda } from '../src/components/agenda';
 import { WorldModel } from '../src/components/world-model';
 import { CognitiveWorker } from '../src/core/worker';
+import { ActionSubsystem } from '../src/components/action';
+import { PerceptionSubsystem } from '../src/components/perception';
+
+import { AttentionModule } from '../src/modules/attention';
 import { ResonanceModule } from '../src/modules/resonance';
 import { SchemaMatcher } from '../src/modules/schema-matcher';
-import { AttentionModule } from '../src/modules/attention';
 import { GoalTreeManager } from '../src/modules/goal-tree-manager';
-import { ReflectionLoop } from '../src/core/reflection';
-import { CognitiveItem, SemanticAtom, UUID } from '../src/types/data';
+
+import { LogExecutor } from '../src/executors/log-executor';
+import { TextTransducer } from '../src/transducers/text-transducer';
+
+import { SemanticAtom, CognitiveItem, UUID } from '../src/types/data';
+import { createAtomId } from '../src/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 
-// --- Test Setup & Helpers ---
 
-const createTestAtom = (content: any, type: "Fact" | "CognitiveSchema" | "Observation" | "Rule" = "Fact", domain: string = "test"): SemanticAtom => {
-    return {
-        id: uuidv4() as UUID,
-        content,
-        embedding: [Math.random(), Math.random()],
-        meta: {
-            type,
-            source: 'test',
-            timestamp: new Date().toISOString(),
-            author: 'tester',
-            trust_score: 0.9,
-            domain,
-            license: 'internal'
-        }
-    };
-};
-
-const createTestItem = (atom: SemanticAtom, type: 'BELIEF' | 'GOAL' | 'QUERY', priority: number = 0.5): CognitiveItem => {
-    return {
-        id: uuidv4() as UUID,
-        atom_id: atom.id,
-        type,
-        attention: { priority, durability: 0.5 },
-        stamp: {
-            timestamp: Date.now(),
-            parent_ids: [],
-            schema_id: 'initial' as UUID,
-        },
-        goal_status: type === 'GOAL' ? 'active' : undefined,
-        truth: type === 'BELIEF' ? { frequency: 0.9, confidence: 0.9 } : undefined,
-    };
-};
-
-describe("Cognitive Architecture Integration Tests", () => {
+describe("Cognitive Architecture Integration Test", () => {
 
     let agenda: Agenda;
     let worldModel: WorldModel;
-    let resonanceModule: ResonanceModule;
+    let actionSubsystem: ActionSubsystem;
+    let perceptionSubsystem: PerceptionSubsystem;
     let schemaMatcher: SchemaMatcher;
-    let attentionModule: AttentionModule;
-    let goalTreeManager: GoalTreeManager;
     let worker: CognitiveWorker;
 
     beforeEach(() => {
+        // --- Full system setup ---
         agenda = new Agenda();
         worldModel = new WorldModel();
-        resonanceModule = new ResonanceModule();
+
+        actionSubsystem = new ActionSubsystem(worldModel);
+        actionSubsystem.register_executor(new LogExecutor());
+
+        perceptionSubsystem = new PerceptionSubsystem(worldModel, agenda);
+        perceptionSubsystem.register_transducer(new TextTransducer());
+
         schemaMatcher = new SchemaMatcher();
-        attentionModule = new AttentionModule();
-        goalTreeManager = new GoalTreeManager();
-        worker = new CognitiveWorker(agenda, worldModel, resonanceModule, schemaMatcher, attentionModule, goalTreeManager);
+
+        worker = new CognitiveWorker(
+            agenda,
+            worldModel,
+            new ResonanceModule(),
+            schemaMatcher,
+            new AttentionModule(),
+            new GoalTreeManager(),
+            actionSubsystem
+        );
     });
 
-    test("Simple Reasoning: A goal should find context and a schema should derive a new belief", async () => {
-        // 1. Setup
-        const goalAtom = createTestAtom({ text: "diagnose patient" });
-        const goalItem = createTestItem(goalAtom, 'GOAL');
-
-        const contextAtom = createTestAtom({ text: "patient has fever" });
-        const contextItem = createTestItem(contextAtom, 'BELIEF');
-
-        const derivedAtom = createTestAtom({ text: "possible flu" });
-        const derivedItem = createTestItem(derivedAtom, 'BELIEF');
-
-        const schemaAtom = createTestAtom({
+    test("Should perceive data, reason to create a goal, and execute the goal", async () => {
+        // 1. Define and register a reasoning schema
+        const schemaContent = {
             pattern: {
-                a: { type: 'GOAL' },
-                b: { type: 'BELIEF' }
-            }
-        }, "CognitiveSchema");
-
-        const schema = schemaMatcher.register_schema(schemaAtom, worldModel);
-        schema.apply = jest.fn().mockReturnValue([derivedItem]);
-
-        worldModel.add_atom(goalAtom);
-        worldModel.add_atom(contextAtom);
-        worldModel.add_atom(schemaAtom);
-        worldModel.add_atom(derivedAtom);
-        worldModel.add_item(goalItem);
-        worldModel.add_item(contextItem);
-
-        agenda.push(goalItem);
-
-        // 2. Execution
-        await worker.cognitive_cycle();
-
-        // 3. Assertion
-        expect(schema.apply).toHaveBeenCalledWith(goalItem, contextItem, worldModel);
-        const nextItem = agenda.peek();
-        expect(nextItem).toBe(derivedItem);
-    });
-
-    test("Goal Hierarchy: A parent goal should be marked 'achieved' when its sub-goal is achieved", async () => {
-        // 1. Setup
-        const parentGoalAtom = createTestAtom({ text: "diagnose patient" });
-        const parentGoalItem = createTestItem(parentGoalAtom, 'GOAL');
-        parentGoalItem.id = 'parent-goal' as UUID;
-
-        const subGoalAtom = createTestAtom({ text: "get symptoms" });
-        // Manually create to set parent ID
-        const subGoalItem: CognitiveItem = {
-            id: 'sub-goal' as UUID,
-            atom_id: subGoalAtom.id,
-            type: 'GOAL',
-            attention: { priority: 0.8, durability: 0.5 },
-            stamp: { timestamp: Date.now(), parent_ids: [parentGoalItem.id], schema_id: 'decomp-schema' as UUID },
-            goal_status: 'active',
-            goal_parent_id: parentGoalItem.id
+                a: { type: 'BELIEF', 'atom.content.text': 'the oven is on' }
+            },
+            apply_args: ['ctx'],
+            apply_logic: `
+                const { a, wm, uuidv4, createAtomId } = ctx;
+                const goal_content = { command: 'log', message: 'Action: Turn off the oven.' };
+                const goal_meta = {
+                    type: "Fact", source: "reasoning:safety-schema", timestamp: new Date().toISOString(),
+                    author: "system", trust_score: 1.0, domain: "safety", license: "internal"
+                };
+                const goal_atom = {
+                    id: createAtomId(goal_content, goal_meta), content: goal_content, embedding: [], meta: goal_meta
+                };
+                const goal_item = {
+                    id: uuidv4(), atom_id: goal_atom.id, type: 'GOAL',
+                    attention: { priority: 1.0, durability: 0.9 },
+                    stamp: { timestamp: Date.now(), parent_ids: [a.id], schema_id: 'safety-schema-atom' },
+                    goal_status: 'active', label: "Turn off oven"
+                };
+                wm.add_atom(goal_atom);
+                return [goal_item];
+            `
         };
+        const schemaAtom: SemanticAtom = {
+            id: 'safety-schema-atom' as any, content: schemaContent, embedding: [],
+            meta: {
+                type: 'CognitiveSchema', source: 'system_definition', timestamp: new Date().toISOString(),
+                author: 'system', trust_score: 1.0, domain: 'safety',
+                label: 'Oven Safety Schema', license: 'internal'
+            }
+        };
+        worldModel.add_atom(schemaAtom);
+        schemaMatcher.register_schema(schemaAtom, worldModel);
 
-        worldModel.add_atom(parentGoalAtom);
-        worldModel.add_atom(subGoalAtom);
-        worldModel.add_item(parentGoalItem);
-        worldModel.add_item(subGoalItem);
+        // 2. Perception
+        perceptionSubsystem.process("the oven is on", "user_report");
+        expect(agenda.size()).toBe(1);
+        const perceivedItem = agenda.peek();
+        expect(perceivedItem?.type).toBe('BELIEF');
 
-        // 2. Execution
-        // Manually mark the sub-goal as achieved
-        subGoalItem.goal_status = 'achieved';
-        await goalTreeManager.mark_achieved(subGoalItem.id, worldModel);
+        // 3. Tick 1: Process the perception, derive the goal
+        await worker.tick();
+        expect(agenda.size()).toBe(1);
+        const goalItem = agenda.peek();
+        expect(goalItem?.type).toBe('GOAL');
+        expect(goalItem?.label).toBe('Turn off oven');
 
-        // 3. Assertion
-        const parentInWorld = worldModel.get_item(parentGoalItem.id);
-        expect(parentInWorld?.goal_status).toBe('achieved');
-    });
+        // Verify the goal was added to the world model
+        const goalInWorld = worldModel.get_item(goalItem!.id);
+        expect(goalInWorld).toBeDefined();
 
-    test("Belief Revision: A new belief should merge with an existing conflicting belief", async () => {
-        // 1. Setup
-        const atom = createTestAtom({ text: "sky color" });
-        const originalBelief = createTestItem(atom, 'BELIEF');
-        originalBelief.truth = { frequency: 1.0, confidence: 0.9 }; // Sky is blue
+        // 4. Tick 2: Process the goal, execute the action
+        const logSpy = jest.spyOn(console, 'log');
+        await worker.tick();
 
-        const newBelief = createTestItem(atom, 'BELIEF');
-        newBelief.truth = { frequency: 0.0, confidence: 0.7 }; // Sky is not blue (e.g., at night)
+        expect(logSpy).toHaveBeenCalledWith('[LogExecutor] Action: Turn off the oven.');
+        expect(goalItem?.goal_status).toBe('achieved');
 
-        worldModel.add_atom(atom);
-        worldModel.add_item(originalBelief);
+        // 5. Tick 3: Process the belief from the action
+        expect(agenda.size()).toBe(1);
+        const resultBelief = agenda.peek();
+        expect(resultBelief?.type).toBe('BELIEF');
+        expect(resultBelief?.label).toContain('Result of logging');
 
-        // 2. Execution
-        worldModel.revise_belief(newBelief);
+        await worker.tick();
 
-        // 3. Assertion
-        const revisedBelief = worldModel.get_item(originalBelief.id);
-        expect(revisedBelief?.truth?.confidence).toBeCloseTo(0.9); // (0.9 + 0.7)/2 + 0.1
-        expect(revisedBelief?.truth?.frequency).toBeCloseTo(0.5625); // (0.9*1 + 0.7*0) / 1.6
-    });
-
-    test("Reflection Loop: The loop should generate a system goal for memory pressure", async () => {
-        // 1. Setup
-        const small_threshold = 5;
-        const reflectionLoop = new ReflectionLoop(worldModel, agenda, 100, { memory: small_threshold, contradiction: 0.05 });
-
-        for (let i = 0; i < small_threshold + 1; i++) {
-            const atom = createTestAtom({ index: i });
-            worldModel.add_atom(atom);
-        }
-
-        // 2. Execution
-        // We call the private run_cycle method for a deterministic test run
-        await (reflectionLoop as any).run_cycle();
-
-        // 3. Assertion
-        const goal = agenda.peek();
-        expect(goal).not.toBeNull();
-        expect(goal?.type).toBe('GOAL');
-        const goalAtom = worldModel.get_atom(goal!.atom_id);
-        expect(goalAtom?.content).toEqual(['compact', 'memory']);
+        // 6. Final state
+        expect(agenda.size()).toBe(0);
+        logSpy.mockRestore();
     });
 });

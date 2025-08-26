@@ -110,4 +110,39 @@ describe('WorldModel', () => {
         expect(revisedBelief?.truth?.frequency).toBeCloseTo(0.6333);
         expect(revisedBelief?.truth?.confidence).toBeCloseTo(0.7);
     });
+
+    it('should get items by filter', () => {
+        const atom1 = createMockAtom();
+        const atom2 = createMockAtom();
+        worldModel.add_atom(atom1);
+        worldModel.add_atom(atom2);
+
+        const belief1 = createMockBelief(atom1.id, { frequency: 1, confidence: 1 });
+        belief1.label = 'special';
+        const belief2 = createMockBelief(atom2.id, { frequency: 1, confidence: 1 });
+        worldModel.add_item(belief1);
+        worldModel.add_item(belief2);
+
+        const results = worldModel.getItemsByFilter(item => item.label === 'special');
+        expect(results.length).toBe(1);
+        expect(results[0]).toEqual(belief1);
+    });
+
+    it('should query by symbolic pattern', () => {
+        const atom1 = createMockAtom();
+        atom1.meta.domain = 'weather';
+        const atom2 = createMockAtom();
+        atom2.meta.domain = 'sports';
+        worldModel.add_atom(atom1);
+        worldModel.add_atom(atom2);
+
+        const belief1 = createMockBelief(atom1.id, { frequency: 1, confidence: 1 });
+        const belief2 = createMockBelief(atom2.id, { frequency: 1, confidence: 1 });
+        worldModel.add_item(belief1);
+        worldModel.add_item(belief2);
+
+        const results = worldModel.query_by_symbolic({ 'atom.meta.domain': 'weather' });
+        expect(results.length).toBe(1);
+        expect(results[0]).toEqual(belief1);
+    });
 });

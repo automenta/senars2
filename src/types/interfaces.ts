@@ -14,7 +14,8 @@ export interface CognitiveSchema {
 
 export interface Agenda {
     push(item: CognitiveItem): void;
-    pop(): Promise<CognitiveItem>;
+    pop(): CognitiveItem | null;
+    pop_async(): Promise<CognitiveItem>;
     peek(): CognitiveItem | null;
     size(): number;
     updateAttention(id: UUID, newVal: AttentionValue): void;
@@ -37,6 +38,7 @@ export interface WorldModel {
     revise_belief(new_item: CognitiveItem): CognitiveItem | null;
     register_schema_atom(atom: SemanticAtom): CognitiveSchema;
     size(): number;
+    getItemsByFilter(filter: (item: CognitiveItem) => boolean): CognitiveItem[];
 }
 
 export interface AttentionModule {
@@ -66,11 +68,21 @@ export interface GoalTreeManager {
     get_ancestors(goal_id: UUID, world_model: WorldModel): Promise<UUID[]>;
 }
 
+export interface TransducerResult {
+    atom: SemanticAtom;
+    item: CognitiveItem;
+}
+
 export interface Transducer {
-    process(data: any): CognitiveItem[] | Promise<CognitiveItem[]>;
+    process(data: any, source: string): TransducerResult | null;
+}
+
+export interface ExecutorResult {
+    belief: CognitiveItem;
+    atom: SemanticAtom;
 }
 
 export interface Executor {
-    can_execute(goal: CognitiveItem): boolean;
-    execute(goal: CognitiveItem): Promise<CognitiveItem>;
+    can_execute(goal: CognitiveItem, world_model: WorldModel): boolean;
+    execute(goal: CognitiveItem, world_model: WorldModel): Promise<ExecutorResult>;
 }

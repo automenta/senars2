@@ -34,7 +34,7 @@ describe('Agenda', () => {
         expect(agenda.peek()).toEqual(item);
     });
 
-    it('should maintain priority order', async () => {
+    it('should maintain priority order with synchronous pop', () => {
         const lowPriorityItem = createMockItem(0.2);
         const highPriorityItem = createMockItem(0.8);
         const midPriorityItem = createMockItem(0.5);
@@ -46,17 +46,20 @@ describe('Agenda', () => {
         expect(agenda.size()).toBe(3);
         expect(agenda.peek()).toEqual(highPriorityItem);
 
-        const poppedItem1 = await agenda.pop();
+        const poppedItem1 = agenda.pop();
         expect(poppedItem1).toEqual(highPriorityItem);
         expect(agenda.size()).toBe(2);
 
-        const poppedItem2 = await agenda.pop();
+        const poppedItem2 = agenda.pop();
         expect(poppedItem2).toEqual(midPriorityItem);
         expect(agenda.size()).toBe(1);
 
-        const poppedItem3 = await agenda.pop();
+        const poppedItem3 = agenda.pop();
         expect(poppedItem3).toEqual(lowPriorityItem);
         expect(agenda.size()).toBe(0);
+
+        const poppedItem4 = agenda.pop();
+        expect(poppedItem4).toBeNull();
     });
 
     it('should update attention and re-prioritize', () => {
@@ -92,8 +95,8 @@ describe('Agenda', () => {
         expect(agenda.size()).toBe(1);
     });
 
-    it('pop should block until an item is available', async () => {
-        const popPromise = agenda.pop();
+    it('pop_async should block until an item is available', async () => {
+        const popPromise = agenda.pop_async();
 
         // Give the pop() a moment to enter its waiting loop
         await new Promise(resolve => setTimeout(resolve, 50));

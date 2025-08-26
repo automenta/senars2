@@ -1,24 +1,24 @@
-import { WorldModel, Agenda } from '../types/interfaces';
+import { WorldModel, Agenda, AttentionModule } from '../types/interfaces';
 import { CognitiveItem, SemanticAtom, UUID } from '../types/data';
 import { v4 as uuidv4 } from 'uuid';
-import { createHash } from 'crypto';
+import { createAtomId } from '../lib/utils';
+
 
 // Helper to create a new goal item and its underlying atom
 function createSystemGoal(content: any, priority: number): { atom: SemanticAtom, item: CognitiveItem } {
     const contentStr = JSON.stringify(content);
-    // Use a UUID for the atom ID for system goals to avoid collisions with content-hashed atoms
     const atomId = uuidv4();
 
     const atom: SemanticAtom = {
         id: atomId,
         content: content,
-        embedding: [], // System goals may not need embeddings
+        embedding: [],
         meta: {
-            type: 'Fact', // The goal's content is a fact
+            type: 'Fact',
             source: 'system_reflection',
             timestamp: new Date().toISOString(),
             author: 'system',
-            trust_score: 1.0, // System goals are trusted
+            trust_score: 1.0,
             domain: 'system',
             license: 'internal'
         }
@@ -34,7 +34,7 @@ function createSystemGoal(content: any, priority: number): { atom: SemanticAtom,
         },
         stamp: {
             timestamp: Date.now(),
-            parent_ids: [], // System goals have no parents
+            parent_ids: [],
             schema_id: 'system_reflection_rule' as UUID,
         },
         goal_status: 'active',
@@ -52,6 +52,7 @@ export class ReflectionLoop {
     constructor(
         private worldModel: WorldModel,
         private agenda: Agenda,
+        private attentionModule: AttentionModule,
         private interval: number = 60000, // default to 60 seconds
         private thresholds = {
             memory: 1000000,
@@ -76,11 +77,15 @@ export class ReflectionLoop {
         console.log("Reflection loop stopped.");
     }
 
-    private async run_cycle() {
+    private run_cycle() {
         console.log("ReflectionLoop: Running self-audit cycle.");
+
+        // 1. Run attention decay
+        this.attentionModule.run_decay_cycle(this.worldModel, this.agenda);
+
+        // 2. Run other checks
         this.check_memory_pressure();
         this.check_contradiction_rate();
-        // In a real system, more checks would go here (e.g., unused schemas).
     }
 
     private check_memory_pressure() {
@@ -94,10 +99,8 @@ export class ReflectionLoop {
     }
 
     private check_contradiction_rate() {
-        // This is a simplified check. A real one would query for a KPI belief.
-        // e.g., world_model.query_by_symbolic({ 'atom.content': ['kpi', 'contradiction_rate', '?'] })
-        // For now, we'll just simulate it.
-        const simulated_rate = Math.random() * 0.1; // Simulate a rate between 0 and 0.1
+        // This is a simplified check.
+        const simulated_rate = Math.random() * 0.1;
         if (simulated_rate > this.thresholds.contradiction) {
             console.log(`ReflectionLoop: High contradiction rate detected (${simulated_rate.toFixed(2)}). Pushing audit goal.`);
             const { atom, item } = createSystemGoal(['run', 'belief_audit'], 0.95);

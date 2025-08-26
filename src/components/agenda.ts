@@ -13,9 +13,24 @@ export class Agenda implements IAgenda {
         this.sort();
     }
 
-    async pop(): Promise<CognitiveItem> {
+    /**
+     * Synchronously pops the highest-priority item from the agenda.
+     * @returns The highest-priority item, or null if the agenda is empty.
+     */
+    pop(): CognitiveItem | null {
+        if (this.items.length === 0) {
+            return null;
+        }
+        return this.items.shift()!;
+    }
+
+    /**
+     * Asynchronously pops an item, waiting if the agenda is empty.
+     * This is for the continuous execution mode.
+     */
+    async pop_async(): Promise<CognitiveItem> {
         while (this.items.length === 0) {
-            await new Promise(resolve => setTimeout(resolve, 10)); // Poll for an item
+            await new Promise(resolve => setTimeout(resolve, 50)); // Poll for an item
         }
         return this.items.shift()!;
     }

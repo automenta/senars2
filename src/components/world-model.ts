@@ -9,6 +9,7 @@ import {
     BeliefRevisionEngine as IBeliefRevisionEngine,
     CognitiveSchema
 } from '../types/interfaces';
+import { getProperty } from '../lib/utils';
 
 export class BeliefRevisionEngine implements IBeliefRevisionEngine {
     merge(existing: TruthValue, newTruth: TruthValue): TruthValue {
@@ -48,10 +49,6 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
         return 0;
     }
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-function getProperty(obj: any, path: string): any {
-    return path.split('.').reduce((o, key) => (o && o[key] !== undefined ? o[key] : undefined), obj);
 }
 
 export class WorldModel implements IWorldModel {
@@ -159,5 +156,21 @@ export class WorldModel implements IWorldModel {
     register_schema_atom(atom: SemanticAtom): CognitiveSchema {
         // This is a placeholder. The actual implementation will be in the SchemaMatcher.
         throw new Error("Schema registration not implemented in WorldModel. See SchemaMatcher.");
+    }
+
+    /**
+     * Retrieves all cognitive items that match a given filter function.
+     * NOTE: This is for debugging and testing. It iterates through all items.
+     * @param filter The function to test each item.
+     * @returns An array of matching items.
+     */
+    public getItemsByFilter(filter: (item: CognitiveItem) => boolean): CognitiveItem[] {
+        const results: CognitiveItem[] = [];
+        for (const item of this.items.values()) {
+            if (filter(item)) {
+                results.push(item);
+            }
+        }
+        return results;
     }
 }
