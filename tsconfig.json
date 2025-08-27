@@ -9,12 +9,13 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@cognitive-arch/types": ["packages/types/src/index.ts"]
+      "@cognitive-arch/types": ["packages/types/dist/index.d.ts"]
     }
   },
   "files": [],
   "references": [
     { "path": "src" },
-    { "path": "frontend" }
+    { "path": "frontend" },
+    { "path": "packages/types" }
   ]
 }

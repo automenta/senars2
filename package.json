@@ -11,7 +11,8 @@
     "test:coverage": "jest --coverage --json --outputFile=test-results.json || true",
     "analyze": "ts-node scripts/analyze-test-results.ts",
     "start": "ts-node src/index.ts",
-    "client": "ts-node test-client.ts"
+    "client": "ts-node test-client.ts",
+    "build": "tsc --build"
   },
   "repository": {
     "type": "git",
