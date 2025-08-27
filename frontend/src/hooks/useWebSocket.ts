@@ -11,10 +11,12 @@ export const useWebSocket = (url: string, { onMessage }: WebSocketHookOptions) =
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('disconnected');
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
+  const clientId = useRef<string>(uuidv4());
 
   const sendMessage = useCallback((message: any) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify(message));
+      const messageWithClient = { ...message, clientId: clientId.current };
+      ws.current.send(JSON.stringify(messageWithClient));
     } else {
       console.error('Cannot send message, WebSocket is not connected.');
     }

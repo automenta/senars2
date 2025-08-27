@@ -58,7 +58,7 @@ function App() {
     }
   }, []);
 
-  const { connectionStatus, sendMessage } = useWebSocket('ws://localhost:8080', handleMessage);
+  const { connectionStatus, sendMessage } = useWebSocket('ws://localhost:8080', { onMessage: handleMessage });
 
   const handleAddGoal = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +72,9 @@ function App() {
   };
 
   const handleCancelGoal = (goalId: string) => {
-    sendMessage({ request_type: 'CANCEL_GOAL', payload: { goalId } });
+    if (window.confirm('Are you sure you want to cancel this goal?')) {
+      sendMessage({ request_type: 'CANCEL_GOAL', payload: { goalId } });
+    }
   };
 
   const handlePrioritizeGoal = (goalId: string) => {
@@ -89,27 +91,31 @@ function App() {
         <div className="goal-list">
           <h2>Goals</h2>
           <ul>
-            {goals.map(goal => (
-              <li key={goal.id} className={`goal-item status-${goal.status}`}>
-                <span className="goal-label">{goal.label}</span>
-                <div className="goal-actions">
-                  <span className="goal-status">{goal.status}</span>
-                  <button
-                    onClick={() => handlePrioritizeGoal(goal.id)}
-                    disabled={connectionStatus !== 'connected' || goal.status !== 'active'}
-                  >
-                    Prioritize
-                  </button>
-                  <button
-                    onClick={() => handleCancelGoal(goal.id)}
-                    disabled={connectionStatus !== 'connected' || goal.status !== 'active'}
-                    className="cancel-button"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </li>
-            ))}
+            {goals.length === 0 ? (
+              <li className="goal-item-empty">No goals yet. Add one below to get started!</li>
+            ) : (
+              goals.map(goal => (
+                <li key={goal.id} className={`goal-item status-${goal.status}`}>
+                  <span className="goal-label">{goal.label}</span>
+                  <div className="goal-actions">
+                    <span className={`goal-status status-${goal.status}`}>{goal.status}</span>
+                    <button
+                      onClick={() => handlePrioritizeGoal(goal.id)}
+                      disabled={connectionStatus !== 'connected' || goal.status !== 'active'}
+                    >
+                      Prioritize
+                    </button>
+                    <button
+                      onClick={() => handleCancelGoal(goal.id)}
+                      disabled={connectionStatus !== 'connected' || goal.status !== 'active'}
+                      className="cancel-button"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </li>
+              ))
+            )}
           </ul>
         </div>
         <form className="add-goal-form" onSubmit={handleAddGoal}>

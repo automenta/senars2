@@ -112,16 +112,20 @@ main {
   text-transform: capitalize;
 }
 
-.status-active {
+.goal-status.status-active {
   background-color: #3498db;
 }
 
-.status-pending {
+.goal-status.status-pending {
   background-color: #f1c40f;
 }
 
-.status-achieved {
+.goal-status.status-achieved {
   background-color: #2ecc71;
+}
+
+.goal-status.status-cancelled {
+  background-color: #e74c3c;
 }
 
 .add-goal-form {
