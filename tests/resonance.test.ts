@@ -33,9 +33,16 @@ describe('ResonanceModule', () => {
       const item = { id: '1', atom_id: 'a1' } as CognitiveItem;
       mockWorldModel.get_atom.mockResolvedValue(null);
 
+      // Suppress the expected console.warn message
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
       const result = await resonanceModule.find_context(item, mockWorldModel, 5);
 
       expect(result).toEqual([]);
+      expect(consoleWarnSpy).toHaveBeenCalledWith('ResonanceModule: Could not find atom for item 1');
+
+      // Restore the original console.warn
+      consoleWarnSpy.mockRestore();
     });
 
     it('should find context without semantic search if embedding is missing', async () => {

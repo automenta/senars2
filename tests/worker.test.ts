@@ -108,11 +108,12 @@ describe('CognitiveWorker', () => {
 
       // Mock logger to spy on it
       const logger = require('../src/lib/logger');
-      const errorSpy = jest.spyOn(logger.logger, 'error');
+      const errorSpy = jest.spyOn(logger.logger, 'error').mockImplementation(() => {});
 
       await (worker as any).process_item(item);
 
       expect(errorSpy).toHaveBeenCalledWith(`Worker failed processing item ${item.id}`, error);
+      errorSpy.mockRestore();
     });
 
     it('should handle schema application errors gracefully', async () => {
@@ -124,11 +125,12 @@ describe('CognitiveWorker', () => {
       mockSchemaMatcher.find_applicable.mockResolvedValue([schema]);
 
       const logger = require('../src/lib/logger');
-      const warnSpy = jest.spyOn(logger.logger, 'warn');
+      const warnSpy = jest.spyOn(logger.logger, 'warn').mockImplementation(() => {});
 
       await (worker as any).process_item(itemA);
 
       expect(warnSpy).toHaveBeenCalledWith(`Schema ${schema.atom_id} failed to apply`, expect.any(Error));
+      warnSpy.mockRestore();
     });
 
     it('should process derived goals correctly', async () => {
