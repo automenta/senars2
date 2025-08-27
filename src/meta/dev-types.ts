@@ -1,26 +1,5 @@
-import { CognitiveItem, SemanticAtom, UUID } from '../types/data';
+import { CognitiveItem, SemanticAtom, UUID, TruthValue, AttentionValue, DerivationStamp } from '@cognitive-arch/types';
 import { v4 as uuidv4 } from 'uuid';
-
-// --- Base Types from core.md ---
-
-// This ensures our dev-time types are compatible with the core system's types.
-// Re-declaring them here for clarity, but they should match `src/types/data.ts`.
-type TruthValue = {
-    frequency: number;
-    confidence: number;
-};
-
-type AttentionValue = {
-    priority: number;
-    durability: number;
-};
-
-type DerivationStamp = {
-    timestamp: number;
-    parent_ids: UUID[];
-    schema_id: UUID;
-    module?: string;
-};
 
 // --- Developer-Facing Artifact Types ---
 

@@ -1,3 +1,4 @@
+import { logger } from './lib/logger';
 import { Agenda } from './components/agenda';
 import { WorldModel } from './components/world-model';
 import { EventBus } from './core/event-bus';
@@ -25,7 +26,7 @@ const NUM_WORKERS = 4;
 const WEBSOCKET_PORT = 8080;
 
 async function main() {
-    console.log("--- System Initialization ---");
+    logger.info("--- System Initialization ---");
 
     const eventBus = new EventBus();
     const agenda = new Agenda();
@@ -59,7 +60,7 @@ async function main() {
 
     const reflectionLoop = new ReflectionLoop(worldModel, agenda, attentionModule, 1000);
 
-    console.log("\n--- Scenario Setup ---");
+    logger.info("--- Scenario Setup ---");
     // Register system schemas
     await worldModel.add_atom(testTriggerSchemaAtom);
     await schemaMatcher.register_schema(testTriggerSchema, worldModel);
@@ -70,9 +71,9 @@ async function main() {
     await worldModel.add_atom(getAllGoalsSchemaAtom);
     await schemaMatcher.register_schema(getAllGoalsSchema, worldModel);
 
-    console.log("All schemas registered. System is ready for controlled execution.");
+    logger.info("All schemas registered. System is ready for controlled execution.");
 
-    console.log("\n--- System Online ---");
+    logger.info("--- System Online ---");
     workerPool.start();
     reflectionLoop.start();
     webSocketServer.start();
@@ -80,4 +81,4 @@ async function main() {
     // The system will now run indefinitely, processing inputs from the WebSocket server.
 }
 
-main().catch(console.error);
+main().catch((err) => logger.error("An unhandled error occurred", err));

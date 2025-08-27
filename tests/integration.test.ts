@@ -1,3 +1,5 @@
+import { logger } from '../src/lib/logger';
+import { Agenda as IAgenda, WorldModel as IWorldModel, SchemaMatcher as ISchemaMatcher } from '@cognitive-arch/types';
 import { Agenda } from '../src/components/agenda';
 import { WorldModel } from '../src/components/world-model';
 import { EventBus } from '../src/core/event-bus';
@@ -16,11 +18,11 @@ import { TextTransducer } from '../src/transducers/text-transducer';
 import { ovenSafetySchema, ovenSafetySchemaAtom } from '../src/schemas/oven-safety-schema';
 
 describe("Cognitive Architecture Integration Test", () => {
-    let agenda: Agenda;
-    let worldModel: WorldModel;
+    let agenda: IAgenda;
+    let worldModel: IWorldModel;
     let actionSubsystem: ActionSubsystem;
     let perceptionSubsystem: PerceptionSubsystem;
-    let schemaMatcher: SchemaMatcher;
+    let schemaMatcher: ISchemaMatcher;
     let worker: CognitiveWorker;
     let eventBus: EventBus;
 
@@ -72,10 +74,10 @@ describe("Cognitive Architecture Integration Test", () => {
         expect(goalInWorld).toBeDefined();
 
         // 4. Tick 2: Process the goal, execute the action
-        const logSpy = jest.spyOn(console, 'log');
+        const logSpy = jest.spyOn(logger, 'info');
         await worker.tick();
 
-        expect(logSpy).toHaveBeenCalledWith('[LogExecutor] Action: Turn off the oven.');
+        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[LogExecutor] Action: Turn off the oven.'));
 
         // Verify the goal was marked as achieved in the database
         const finalGoal = await worldModel.get_item(goalItem!.id);

@@ -1,6 +1,6 @@
-import { Agenda, WorldModel, ResonanceModule, SchemaMatcher, AttentionModule, GoalTreeManager } from '../types/interfaces';
+import { logger } from '../lib/logger';
+import { Agenda, WorldModel, ResonanceModule, SchemaMatcher, AttentionModule, GoalTreeManager, CognitiveItem } from '@cognitive-arch/types';
 import { ActionSubsystem } from '../components/action';
-import { CognitiveItem } from '../types/data';
 
 export class CognitiveWorker {
     private running: boolean = true;
@@ -16,18 +16,18 @@ export class CognitiveWorker {
     ) {}
 
     public stop() {
-        console.log("Cognitive worker stopping...");
+        logger.info("Cognitive worker stopping...");
         this.running = false;
     }
 
     public async start() {
-        console.log("Cognitive worker started (async mode).");
+        logger.info("Cognitive worker started (async mode).");
         while (this.running) {
             const itemA = await this.agenda.pop_async();
             if (!this.running) break;
             await this.process_item(itemA);
         }
-        console.log("Cognitive worker stopped.");
+        logger.info("Cognitive worker stopped.");
     }
 
     public async tick(): Promise<boolean> {
@@ -90,7 +90,7 @@ export class CognitiveWorker {
                             this.agenda.push(newItem);
                         }
                     } catch (e) {
-                        console.warn(`Schema ${schema.atom_id} failed to apply`, e);
+                        logger.warn(`Schema ${schema.atom_id} failed to apply`, e);
                     }
                 }
             }
@@ -130,7 +130,7 @@ export class CognitiveWorker {
                 }
             }
         } catch (e) {
-            console.error(`Worker failed processing item ${itemA.id}`, e);
+            logger.error(`Worker failed processing item ${itemA.id}`, e);
         }
     }
 }

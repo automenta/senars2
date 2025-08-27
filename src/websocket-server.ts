@@ -1,3 +1,4 @@
+import { logger } from './lib/logger';
 import { WebSocketServer as WSServer, WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import { PerceptionSubsystem } from './components/perception';
@@ -24,7 +25,7 @@ export class WebSocketServer {
         this.wss.on('connection', (ws: WebSocket) => {
             const clientId = uuidv4();
             this.clients.set(clientId, ws);
-            console.log(`[WebSocket] Client connected: ${clientId}`);
+            logger.info(`Client connected: ${clientId}`);
 
             ws.on('message', (message: string) => {
                 try {
@@ -33,23 +34,23 @@ export class WebSocketServer {
                     const messageWithClient = { ...parsedMessage, clientId };
                     this.perceptionSubsystem.process(messageWithClient, 'websocket_input');
                 } catch (error) {
-                    console.error(`[WebSocket] Error parsing message from ${clientId}:`, error);
+                    logger.error(`Error parsing message from ${clientId}:`, error);
                     ws.send(JSON.stringify({ error: 'Invalid JSON message' }));
                 }
             });
 
             ws.on('close', () => {
                 this.clients.delete(clientId);
-                console.log(`[WebSocket] Client disconnected: ${clientId}`);
+                logger.info(`Client disconnected: ${clientId}`);
             });
 
             ws.on('error', (error) => {
-                console.error(`[WebSocket] Error with client ${clientId}:`, error);
+                logger.error(`Error with client ${clientId}:`, error);
                 this.clients.delete(clientId);
             });
         });
 
-        console.log(`[WebSocket] Server started on port ${this.wss.options.port}`);
+        logger.info(`Server started on port ${this.wss.options.port}`);
     }
 
     public broadcast(message: any) {
@@ -66,7 +67,7 @@ export class WebSocketServer {
         if (client && client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify(message));
         } else {
-            console.log(`[WebSocket] Could not send message to client ${clientId}, client not found or connection not open.`);
+            logger.warn(`Could not send message to client ${clientId}, client not found or connection not open.`);
         }
     }
 

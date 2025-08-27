@@ -1,8 +1,13 @@
+import { logger } from '../../src/lib/logger';
 import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import './App.css';
 import EventLog from './EventLog';
-import { CognitiveItem } from './types';
+import { CognitiveItem as CoreCognitiveItem } from '@cognitive-arch/types';
+
+type CognitiveItem = CoreCognitiveItem & {
+    raw_data: string;
+};
 
 type Goal = {
   id: string;
@@ -37,7 +42,7 @@ function App() {
 
   const connect = () => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      console.log("WebSocket is already connected.");
+      logger.debug("WebSocket is already connected.");
       return;
     }
 
@@ -46,7 +51,7 @@ function App() {
     ws.current = websocket;
 
     websocket.onopen = () => {
-      console.log('WebSocket connected');
+      logger.info('WebSocket connected');
       setConnectionStatus('connected');
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current);
@@ -61,7 +66,7 @@ function App() {
     };
 
     websocket.onmessage = (event) => {
-      console.log('WebSocket message received:', event.data);
+      logger.debug('WebSocket message received:', event.data);
       try {
         const message = JSON.parse(event.data);
 
@@ -78,7 +83,7 @@ function App() {
         if (Array.isArray(message.goals)) {
           setGoals(message.goals);
         } else if (message.goalId) {
-          console.log(`Goal creation acknowledged for goalId: ${message.goalId}`);
+          logger.info(`Goal creation acknowledged for goalId: ${message.goalId}`);
         }
         return;
       }
@@ -101,24 +106,24 @@ function App() {
         }
 
       } catch (error) {
-        console.error("Failed to parse WebSocket message:", error);
+        logger.error("Failed to parse WebSocket message:", error);
       }
     };
 
     websocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      logger.error('WebSocket error:', error);
       setConnectionStatus('error');
     };
 
     websocket.onclose = () => {
-      console.log('WebSocket disconnected');
+      logger.info('WebSocket disconnected');
       if (reconnectTimer.current) {
         // Avoid setting multiple timers
         return;
       }
       setConnectionStatus('reconnecting');
       reconnectTimer.current = setTimeout(() => {
-        console.log('Attempting to reconnect...');
+        logger.info('Attempting to reconnect...');
         connect();
       }, 3000);
     };

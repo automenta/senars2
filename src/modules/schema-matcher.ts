@@ -1,5 +1,5 @@
-import { SchemaMatcher as ISchemaMatcher, CognitiveSchema, WorldModel } from '../types/interfaces';
-import { CognitiveItem, SemanticAtom, UUID } from '../types/data';
+import { logger } from '../lib/logger';
+import { SchemaMatcher as ISchemaMatcher, CognitiveSchema, WorldModel, CognitiveItem, SemanticAtom, UUID } from '@cognitive-arch/types';
 import { itemMatchesPattern } from '../lib/utils';
 
 export class SchemaMatcher implements ISchemaMatcher {
@@ -34,7 +34,7 @@ export class SchemaMatcher implements ISchemaMatcher {
             }
         }
 
-        console.log(`Successfully registered and indexed schema for: ${schema.atom_id}`);
+        logger.info(`Successfully registered and indexed schema for: ${schema.atom_id}`);
         return schema;
     }
 

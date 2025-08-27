@@ -1,9 +1,6 @@
 import { GoalTreeManager } from '../src/modules/goal-tree-manager';
-import { WorldModel } from '../src/types/interfaces';
-import { CognitiveItem, UUID } from '../src/types/data';
+import { WorldModel, CognitiveItem, UUID, GoalStatus } from '@cognitive-arch/types';
 import { v4 as uuidv4 } from 'uuid';
-
-import { GoalStatus } from '../src/types/data';
 
 const createMockGoal = (parent_id: UUID | null = null, status: GoalStatus = 'active'): CognitiveItem => ({
     id: uuidv4() as UUID,

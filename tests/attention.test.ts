@@ -1,6 +1,5 @@
 import { AttentionModule } from '../src/modules/attention';
-import { WorldModel, Agenda, CognitiveSchema } from '../src/types/interfaces';
-import { CognitiveItem, AttentionValue } from '../src/types/data';
+import { WorldModel, Agenda, CognitiveSchema, CognitiveItem, AttentionValue } from '@cognitive-arch/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const createMockItem = (attention: AttentionValue): CognitiveItem => ({

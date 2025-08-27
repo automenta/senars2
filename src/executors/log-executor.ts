@@ -1,5 +1,5 @@
-import { Executor, ExecutorResult, WorldModel } from "../types/interfaces";
-import { CognitiveItem, SemanticAtom } from "../types/data";
+import { logger } from "../lib/logger";
+import { Executor, ExecutorResult, WorldModel, CognitiveItem, SemanticAtom } from "@cognitive-arch/types";
 import { v4 as uuidv4 } from "uuid";
 import { createAtomId } from "../lib/utils";
 
@@ -19,7 +19,7 @@ export class LogExecutor implements Executor {
         const content = await this.getGoalContent(goal, world_model);
         const message = content?.message ?? 'No message provided.';
 
-        console.log(`[LogExecutor] ${message}`);
+        logger.info(`[LogExecutor] ${message}`);
 
         const result_content = {
             result: 'Log command executed successfully.',

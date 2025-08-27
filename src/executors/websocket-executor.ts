@@ -1,5 +1,5 @@
-import { CognitiveItem } from '../types/data';
-import { Executor, ExecutorResult, WorldModel } from '../types/interfaces';
+import { logger } from '../lib/logger';
+import { CognitiveItem, Executor, ExecutorResult, WorldModel } from '@cognitive-arch/types';
 import { WebSocketServer } from '../websocket-server';
 import { createAtomId } from '../lib/utils';
 import { v4 as uuidv4 } from 'uuid';
@@ -37,7 +37,7 @@ export class WebSocketExecutor implements Executor {
 
         this.webSocketServer.sendMessage(clientId, response);
 
-        console.log(`[WebSocketExecutor] Sent message to client ${clientId}`);
+        logger.info(`Sent message to client ${clientId}`);
 
         // The result of this execution is a belief that the message was sent.
         const result_atom_content = {

@@ -4,7 +4,7 @@
  * @param path The dot-notation path to the property (e.g., 'meta.domain').
  * @returns The property value, or undefined if the path is invalid.
  */
-import { CognitiveItem, SemanticAtom, UUID } from "../types/data";
+import { CognitiveItem, SemanticAtom, UUID } from "@cognitive-arch/types";
 import { createHash } from 'crypto';
 
 export function getProperty(obj: any, path: string): any {

@@ -4,8 +4,8 @@ module.exports = {
   },
   testEnvironment: 'node',
   testRegex: '/tests/.*\\.(test|spec)?\\.(ts|tsx)$',
-  testPathIgnorePatterns: ['/node_modules/', '/frontend/'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   collectCoverage: true,
   coverageReporters: ['json-summary', 'text', 'lcov'],
+  roots: ['<rootDir>/src', '<rootDir>/tests'],
 };

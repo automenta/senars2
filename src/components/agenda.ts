@@ -1,5 +1,4 @@
-import { CognitiveItem, UUID, AttentionValue } from '../types/data';
-import { Agenda as IAgenda } from '../types/interfaces';
+import { CognitiveItem, UUID, AttentionValue, Agenda as IAgenda } from '@cognitive-arch/types';
 import { PriorityQueue } from '../lib/priority-queue';
 
 type PromiseResolver = (item: CognitiveItem) => void;

@@ -1,5 +1,4 @@
-import { CognitiveSchema, SchemaDerivedData, WorldModel } from '../types/interfaces';
-import { CognitiveItem, SemanticAtom } from '../types/data';
+import { CognitiveSchema, SchemaDerivedData, WorldModel, CognitiveItem, SemanticAtom } from '@cognitive-arch/types';
 import { createAtomId } from '../lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 

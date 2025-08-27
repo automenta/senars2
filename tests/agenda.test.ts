@@ -1,5 +1,5 @@
 import { Agenda } from '../src/components/agenda';
-import { CognitiveItem, UUID } from '../src/types/data';
+import { CognitiveItem, UUID } from '@cognitive-arch/types';
 import { v4 as uuidv4 } from 'uuid';
 
 // Helper to create a dummy CognitiveItem

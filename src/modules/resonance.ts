@@ -1,5 +1,4 @@
-import { ResonanceModule as IResonanceModule, WorldModel } from '../types/interfaces';
-import { CognitiveItem, SemanticAtom, UUID } from '../types/data';
+import { ResonanceModule as IResonanceModule, WorldModel, CognitiveItem, SemanticAtom, UUID } from '@cognitive-arch/types';
 import { cosineSimilarity } from '../lib/utils';
 
 type ScoredItem = {

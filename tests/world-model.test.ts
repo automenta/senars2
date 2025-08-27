@@ -1,6 +1,6 @@
 import { WorldModel } from '../src/components/world-model';
 import { EventBus } from '../src/core/event-bus';
-import { SemanticAtom, CognitiveItem, UUID, TruthValue } from '../src/types/data';
+import { SemanticAtom, CognitiveItem, UUID, TruthValue } from '@cognitive-arch/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const createMockAtom = (domain?: string): SemanticAtom => ({

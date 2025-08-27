@@ -1,5 +1,5 @@
-import { AttentionModule as IAttentionModule, CognitiveSchema, WorldModel, Agenda } from '../types/interfaces';
-import { CognitiveItem, AttentionValue } from '../types/data';
+import { logger } from '../lib/logger';
+import { AttentionModule as IAttentionModule, CognitiveSchema, WorldModel, Agenda, CognitiveItem, AttentionValue } from '@cognitive-arch/types';
 
 const DECAY_FACTOR = 0.98; // Keep 98% of attention each cycle
 const ACCESS_BOOST = 0.1;
@@ -54,7 +54,7 @@ export class AttentionModule implements IAttentionModule {
     }
 
     async run_decay_cycle(world_model: WorldModel, agenda: Agenda): Promise<void> {
-        console.log("AttentionModule: Running attention decay cycle...");
+        logger.info("Running attention decay cycle...");
         let decayedItems = 0;
 
         // Decay items in the WorldModel
@@ -85,6 +85,6 @@ export class AttentionModule implements IAttentionModule {
             decayedItems++;
         });
 
-        console.log(`AttentionModule: Decayed attention for ${decayedItems} total items.`);
+        logger.info(`Decayed attention for ${decayedItems} total items.`);
     }
 }

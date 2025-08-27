@@ -1,5 +1,4 @@
-import { GoalTreeManager as IGoalTreeManager, WorldModel } from '../types/interfaces';
-import { CognitiveItem, UUID } from '../types/data';
+import { GoalTreeManager as IGoalTreeManager, WorldModel, CognitiveItem, UUID } from '@cognitive-arch/types';
 
 export class GoalTreeManager implements IGoalTreeManager {
     decompose(goal: CognitiveItem, world_model: WorldModel): CognitiveItem[] {

@@ -1,5 +1,5 @@
-import { WorldModel, Agenda, AttentionModule } from '../types/interfaces';
-import { CognitiveItem, SemanticAtom, UUID } from '../types/data';
+import { logger } from '../lib/logger';
+import { WorldModel, Agenda, AttentionModule, CognitiveItem, SemanticAtom, UUID } from '@cognitive-arch/types';
 import { v4 as uuidv4 } from 'uuid';
 import { createAtomId } from '../lib/utils';
 
@@ -63,7 +63,7 @@ export class ReflectionLoop {
     public start() {
         if (this.running) return;
         this.running = true;
-        console.log(`Reflection loop started. Running every ${this.interval / 1000}s.`);
+        logger.info(`Reflection loop started. Running every ${this.interval / 1000}s.`);
         this.timer = setInterval(() => this.run_cycle(), this.interval);
     }
 
@@ -74,11 +74,11 @@ export class ReflectionLoop {
             clearInterval(this.timer);
             this.timer = null;
         }
-        console.log("Reflection loop stopped.");
+        logger.info("Reflection loop stopped.");
     }
 
     private async run_cycle() {
-        console.log("ReflectionLoop: Running self-audit cycle.");
+        logger.info("Running self-audit cycle.");
 
         // 1. Run attention decay
         // This likely needs to be async as well if it interacts with the world model,
@@ -93,7 +93,7 @@ export class ReflectionLoop {
     private async check_memory_pressure() {
         const current_size = await this.worldModel.size();
         if (current_size > this.thresholds.memory) {
-            console.log(`ReflectionLoop: Memory pressure detected (${current_size} atoms). Pushing compaction goal.`);
+            logger.info(`Memory pressure detected (${current_size} atoms). Pushing compaction goal.`);
             const { atom, item } = createSystemGoal('compact_memory', {}, 0.8);
             await this.worldModel.add_atom(atom);
             this.agenda.push(item);
@@ -104,7 +104,7 @@ export class ReflectionLoop {
         // This is a simplified check.
         const simulated_rate = Math.random() * 0.1;
         if (simulated_rate > this.thresholds.contradiction) {
-            console.log(`ReflectionLoop: High contradiction rate detected (${simulated_rate.toFixed(2)}). Pushing audit goal.`);
+            logger.info(`High contradiction rate detected (${simulated_rate.toFixed(2)}). Pushing audit goal.`);
             const { atom, item } = createSystemGoal('run_belief_audit', { rate: simulated_rate }, 0.95);
             await this.worldModel.add_atom(atom);
             this.agenda.push(item);

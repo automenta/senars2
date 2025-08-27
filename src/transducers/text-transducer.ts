@@ -1,5 +1,4 @@
-import { Transducer, TransducerResult } from "../types/interfaces";
-import { CognitiveItem, SemanticAtom } from "../types/data";
+import { Transducer, TransducerResult, CognitiveItem, SemanticAtom } from "@cognitive-arch/types";
 import { v4 as uuidv4 } from "uuid";
 import { createAtomId } from "../lib/utils";
 

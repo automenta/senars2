@@ -2,13 +2,12 @@ import {
     CognitiveItem,
     SemanticAtom,
     UUID,
-    TruthValue
-} from '../types/data';
-import {
+    TruthValue,
     WorldModel as IWorldModel,
     BeliefRevisionEngine as IBeliefRevisionEngine,
     CognitiveSchema
-} from '../types/interfaces';
+} from '@cognitive-arch/types';
+import { logger } from '../lib/logger';
 import { EventBus } from '../core/event-bus';
 
 // HNSWLib for semantic search
@@ -205,7 +204,7 @@ export class WorldModel implements IWorldModel {
         if (existing_item && existing_item.truth) {
             // An item with this atom already exists, so revise it
             if (this.beliefRevisionEngine.detect_conflict(existing_item.truth, new_item.truth)) {
-                console.warn(`Conflict detected for atom ${new_item.atom_id}. Merging truth values.`);
+                logger.warn(`Conflict detected for atom ${new_item.atom_id}. Merging truth values.`);
             }
             const newTruth = this.beliefRevisionEngine.merge(existing_item.truth, new_item.truth);
             await this.update_item(existing_item.id, { truth: newTruth });

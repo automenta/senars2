@@ -1,5 +1,6 @@
 import { Subject, Observable } from 'rxjs';
 import { filter, map } from 'rxjs/operators';
+import { logger } from '../lib/logger';
 
 interface Event {
     type: string;
@@ -10,9 +11,7 @@ export class EventBus {
     private eventSubject = new Subject<Event>();
 
     public publish(type: string, payload: any) {
-        if (process.env.NODE_ENV !== 'test') {
-            console.log(`[EventBus] Publishing event: ${type}`);
-        }
+        logger.debug(`Publishing event: ${type}`);
         this.eventSubject.next({ type, payload });
     }
 

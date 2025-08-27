@@ -1,4 +1,5 @@
-import { Agenda, WorldModel, Transducer } from '../types/interfaces';
+import { logger } from '../lib/logger';
+import { Agenda, WorldModel, Transducer } from '@cognitive-arch/types';
 
 export class PerceptionSubsystem {
     private transducers: Transducer[] = [];
@@ -10,7 +11,7 @@ export class PerceptionSubsystem {
 
     register_transducer(transducer: Transducer): void {
         this.transducers.push(transducer);
-        console.log(`PerceptionSubsystem: Registered transducer: ${transducer.constructor.name}`);
+        logger.info(`Registered transducer: ${transducer.constructor.name}`);
     }
 
     /**
@@ -23,21 +24,21 @@ export class PerceptionSubsystem {
         for (const transducer of this.transducers) {
             const result = transducer.process(data, source);
             if (result) {
-                console.log(`PerceptionSubsystem: Data from '${source}' processed by ${transducer.constructor.name}.`);
+                logger.info(`Data from '${source}' processed by ${transducer.constructor.name}.`);
 
                 // Add the new atom and item to the core components
                 this.worldModel.add_atom(result.atom);
                 this.worldModel.add_item(result.item);
                 this.agenda.push(result.item);
 
-                console.log(`PerceptionSubsystem: Pushed new item to agenda: ${result.item.label ?? result.item.id}`);
+                logger.info(`Pushed new item to agenda: ${result.item.label ?? result.item.id}`);
                 processed = true;
                 break; // Stop after the first successful transducer
             }
         }
 
         if (!processed) {
-            console.warn(`PerceptionSubsystem: No transducer found for data from source '${source}'.`);
+            logger.warn(`No transducer found for data from source '${source}'.`);
         }
     }
 }

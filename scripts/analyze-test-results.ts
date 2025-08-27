@@ -1,3 +1,4 @@
+import { logger } from '../src/lib/logger';
 import { exec } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -45,14 +46,14 @@ type CoverageSummary = {
  */
 function runTests(): Promise<void> {
     return new Promise((resolve, reject) => {
-        console.log('Running tests with coverage...');
+        logger.info('Running tests with coverage...');
         exec('npm run test:coverage', (error, stdout, stderr) => {
             if (error && error.code !== 0) {
-                console.warn(`Test command exited with code ${error.code}, but we proceed to analysis.`);
+                logger.warn(`Test command exited with code ${error.code}, but we proceed to analysis.`);
             }
-            console.log(stdout);
-            console.error(stderr);
-            console.log('Test run finished.');
+            if (stdout) logger.info(stdout);
+            if (stderr) logger.error(stderr);
+            logger.info('Test run finished.');
             resolve();
         });
     });
@@ -63,7 +64,7 @@ function runTests(): Promise<void> {
  */
 function analyzeTestFailures(): TestFailure[] {
     if (!fs.existsSync(TEST_RESULTS_PATH)) {
-        console.error('Test results file not found!');
+        logger.error('Test results file not found!');
         return [];
     }
     const testData: JestJsonOutput = JSON.parse(fs.readFileSync(TEST_RESULTS_PATH, 'utf-8'));
@@ -125,7 +126,7 @@ function analyzeTestFailures(): TestFailure[] {
  */
 function analyzeCodeCoverage(): CodeCoverageReport[] {
     if (!fs.existsSync(COVERAGE_SUMMARY_PATH)) {
-        console.error('Coverage summary file not found!');
+        logger.error('Coverage summary file not found!');
         return [];
     }
     const coverageData: CoverageSummary = JSON.parse(fs.readFileSync(COVERAGE_SUMMARY_PATH, 'utf-8'));
@@ -164,7 +165,7 @@ function analyzeCodeCoverage(): CodeCoverageReport[] {
  */
 function loadRequirements(): FunctionalityRequirement[] {
     if (!fs.existsSync(REQUIREMENTS_PATH)) {
-        console.error('Requirements file not found!');
+        logger.error('Requirements file not found!');
         return [];
     }
     return JSON.parse(fs.readFileSync(REQUIREMENTS_PATH, 'utf-8'));
@@ -174,42 +175,42 @@ function loadRequirements(): FunctionalityRequirement[] {
  * A simple reasoning engine to connect failures, coverage, and requirements.
  */
 function reason(failures: TestFailure[], coverage: CodeCoverageReport[], requirements: FunctionalityRequirement[]) {
-    console.log('\n--- 🧠 Development Analysis Report ---');
+    logger.info('\n--- 🧠 Development Analysis Report ---');
 
     if (failures.length > 0) {
-        console.log('\n🚨 Test Failures Detected:');
+        logger.info('\n🚨 Test Failures Detected:');
         for (const failure of failures) {
-            console.log(`  - Test: ${failure.meta.testName}`);
-            console.log(`    Error: ${failure.meta.errorMessage.split('\n')[0]}`);
+            logger.info(`  - Test: ${failure.meta.testName}`);
+            logger.info(`    Error: ${failure.meta.errorMessage.split('\n')[0]}`);
             // Simple reasoning: find related file in coverage
             const relatedFile = coverage.find(c => failure.meta.testName.includes(path.basename(c.meta.filePath, '.ts')));
             if (relatedFile) {
-                console.log(`    Possible related file: ${relatedFile.meta.filePath} (Coverage: ${relatedFile.meta.statementCoverage}%)`);
+                logger.info(`    Possible related file: ${relatedFile.meta.filePath} (Coverage: ${relatedFile.meta.statementCoverage}%)`);
             }
         }
     } else {
-        console.log('\n✅ All tests passed!');
+        logger.info('\n✅ All tests passed!');
     }
 
-    console.log('\n📊 Code Coverage Summary:');
+    logger.info('\n📊 Code Coverage Summary:');
     const totalCoverage = coverage.find(c => c.meta.filePath.endsWith('total')); // Heuristic
     if (totalCoverage) {
         // This is not how the summary is structured, need to get the 'total' key
     }
     const summary = JSON.parse(fs.readFileSync(COVERAGE_SUMMARY_PATH, 'utf-8'));
-    console.log(`  - Statements: ${summary.total.statements.pct}%`);
-    console.log(`  - Branches: ${summary.total.branches.pct}%`);
-    console.log(`  - Functions: ${summary.total.functions.pct}%`);
+    logger.info(`  - Statements: ${summary.total.statements.pct}%`);
+    logger.info(`  - Branches: ${summary.total.branches.pct}%`);
+    logger.info(`  - Functions: ${summary.total.functions.pct}%`);
 
 
-    console.log('\n🎯 Functionality Requirements Status:');
+    logger.info('\n🎯 Functionality Requirements Status:');
     for (const req of requirements) {
         // Simple reasoning: if there are failures, the requirements might be at risk.
         const status = failures.length > 0 ? '⚠️ AT RISK' : '✅ MET';
-        console.log(`  - [${status}] ${req.meta.description}`);
+        logger.info(`  - [${status}] ${req.meta.description}`);
     }
 
-    console.log('\n--- End of Report ---');
+    logger.info('\n--- End of Report ---');
 }
 
 
@@ -222,6 +223,6 @@ async function main() {
 }
 
 main().catch(error => {
-    console.error('Analysis script failed:', error);
+    logger.error('Analysis script failed:', error);
     process.exit(1);
 });
