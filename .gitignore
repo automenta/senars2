@@ -6,3 +6,13 @@ dist/
 coverage/
 test-results.json
 junit.xml
+
+# Log files
+*.log
+
+# Build artifacts
+/packages/types/dist
+/packages/types/tsconfig.tsbuildinfo
+
+# Agent scratchpad
+jules-scratch/

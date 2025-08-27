@@ -3,17 +3,21 @@ import { WebSocketServer as WSServer, WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import { PerceptionSubsystem } from './components/perception';
 import { EventBus } from './core/event-bus';
+import { Agenda } from './components/agenda';
+import { AttentionValue } from '@cognitive-arch/types';
 
 export class WebSocketServer {
     private wss: WSServer;
     public clients: Map<string, WebSocket> = new Map();
     private perceptionSubsystem: PerceptionSubsystem;
     private eventBus: EventBus;
+    private agenda: Agenda;
 
-    constructor(port: number, perceptionSubsystem: PerceptionSubsystem, eventBus: EventBus) {
+    constructor(port: number, perceptionSubsystem: PerceptionSubsystem, eventBus: EventBus, agenda: Agenda) {
         this.wss = new WSServer({ port });
         this.perceptionSubsystem = perceptionSubsystem;
         this.eventBus = eventBus;
+        this.agenda = agenda;
     }
 
     public start() {
@@ -30,9 +34,28 @@ export class WebSocketServer {
             ws.on('message', (message: string) => {
                 try {
                     const parsedMessage = JSON.parse(message.toString());
-                    // Add clientId to the message so the system can respond
                     const messageWithClient = { ...parsedMessage, clientId };
-                    this.perceptionSubsystem.process(messageWithClient, 'websocket_input');
+
+                    switch (parsedMessage.request_type) {
+                        case 'CANCEL_GOAL':
+                            logger.info(`Received CANCEL_GOAL for goalId: ${parsedMessage.payload.goalId}`);
+                            this.agenda.remove(parsedMessage.payload.goalId);
+                            // Optional: send confirmation back to client
+                            this.sendMessage(clientId, { status: 'success', message: `Goal ${parsedMessage.payload.goalId} cancelled.` });
+                            break;
+                        case 'PRIORITIZE_GOAL':
+                            logger.info(`Received PRIORITIZE_GOAL for goalId: ${parsedMessage.payload.goalId}`);
+                            const item = this.agenda.get(parsedMessage.payload.goalId);
+                            if (item) {
+                                const newAttention: AttentionValue = { ...item.attention, priority: 1.0 };
+                                this.agenda.updateAttention(item.id, newAttention);
+                                this.sendMessage(clientId, { status: 'success', message: `Goal ${parsedMessage.payload.goalId} prioritized.` });
+                            }
+                            break;
+                        default:
+                            // Pass to perception subsystem for normal processing
+                            this.perceptionSubsystem.process(messageWithClient, 'websocket_input');
+                    }
                 } catch (error) {
                     logger.error(`Error parsing message from ${clientId}:`, error);
                     ws.send(JSON.stringify({ error: 'Invalid JSON message' }));

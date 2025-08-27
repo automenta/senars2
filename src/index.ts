@@ -20,7 +20,7 @@ import { WebSocketServer } from './websocket-server';
 
 import { testTriggerSchema, testTriggerSchemaAtom } from './schemas/test-trigger-schema';
 import { createGoalSchema, createGoalSchemaAtom, getAllGoalsSchema, getAllGoalsSchemaAtom } from './schemas/websocket_api_schema';
-import { SemanticAtom } from './types/data';
+import { SemanticAtom } from '@cognitive-arch/types';
 
 const NUM_WORKERS = 4;
 const WEBSOCKET_PORT = 8080;
@@ -34,7 +34,7 @@ async function main() {
     const actionSubsystem = new ActionSubsystem(worldModel);
     const perceptionSubsystem = new PerceptionSubsystem(worldModel, agenda);
 
-    const webSocketServer = new WebSocketServer(WEBSOCKET_PORT, perceptionSubsystem, eventBus);
+    const webSocketServer = new WebSocketServer(WEBSOCKET_PORT, perceptionSubsystem, eventBus, agenda);
 
     const attentionModule = new AttentionModule();
     const resonanceModule = new ResonanceModule();

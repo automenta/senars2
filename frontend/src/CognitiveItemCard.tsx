@@ -37,12 +37,16 @@ const CognitiveItemCard: React.FC<CognitiveItemCardProps> = ({ item }) => {
       <div className="card-footer">
         {truth && (
           <div className="item-truth">
-            <span>T: (F: {truth.frequency.toFixed(2)}, C: {truth.confidence.toFixed(2)})</span>
+            <strong>Truth:</strong> F: {truth.frequency.toFixed(2)}, C: {truth.confidence.toFixed(2)}
           </div>
         )}
         <div className="item-attention">
-          <span>A: (P: {attention.priority.toFixed(2)}, D: {attention.durability.toFixed(2)})</span>
+          <strong>Attention:</strong> P: {attention.priority.toFixed(2)}, D: {attention.durability.toFixed(2)}
         </div>
+      </div>
+      <div className="card-ids">
+        <span className="item-id">ID: {item.id}</span>
+        <span className="atom-id">Atom ID: {item.atom_id}</span>
       </div>
     </div>
   );
