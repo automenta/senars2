@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { FunctionalityRequirement, TestFailure, CodeCoverageReport } from '../src/meta/dev-types';
 import { v4 as uuidv4 } from 'uuid';
-import { UUID } from '../src/types/data';
+import { UUID } from '@cognitive-arch/types';
 
 const TEST_RESULTS_PATH = 'test-results.json';
 const COVERAGE_SUMMARY_PATH = 'coverage/coverage-summary.json';
