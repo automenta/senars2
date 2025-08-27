@@ -31,18 +31,19 @@ export class ActionSubsystem {
             return null;
         }
 
+        const goalIdentifier = goal.label ?? goal.id;
         try {
-            logger.info(`Executing goal ${goal.label ?? goal.id} with ${executor.constructor.name}`);
+            logger.info(`Executing goal ${goalIdentifier} with ${executor.constructor.name}`);
             const result = await executor.execute(goal, this.worldModel);
 
             // Mark the original goal as achieved
             await this.worldModel.update_item(goal.id, { goal_status: 'achieved' });
-            logger.info(`Goal ${goal.label ?? goal.id} executed successfully.`);
+            logger.info(`Goal ${goalIdentifier} executed successfully.`);
 
             // Return the full result to the worker for orchestration
             return result;
         } catch (error) {
-            logger.error(`Executor ${executor.constructor.name} failed for goal ${goal.label ?? goal.id}`, error);
+            logger.error(`Executor ${executor.constructor.name} failed for goal ${goalIdentifier}`, error);
             // Mark the goal as failed
             await this.worldModel.update_item(goal.id, { goal_status: 'failed' });
             return null;
