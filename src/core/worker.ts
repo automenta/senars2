@@ -25,7 +25,9 @@ export class CognitiveWorker {
         while (this.running) {
             const itemA = await this.agenda.pop_async();
             if (!this.running) break;
-            await this.process_item(itemA);
+            if (itemA) {
+                await this.process_item(itemA);
+            }
         }
         logger.info("Cognitive worker stopped.");
     }
