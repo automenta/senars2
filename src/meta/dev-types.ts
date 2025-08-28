@@ -59,7 +59,7 @@ export type CodeCoverageReport = CognitiveItem & {
  * Creates a SemanticAtom for a given piece of content, ensuring a verifiable ID.
  * In a real implementation, the ID would be a hash of the content. Here we use UUIDs.
  */
-function createAtom(content: any, meta: Record<string, any>): SemanticAtom {
+function createAtom(content: any, meta: SemanticAtom['meta']): SemanticAtom {
     return {
         id: uuidv4() as UUID,
         content: content,
@@ -69,13 +69,25 @@ function createAtom(content: any, meta: Record<string, any>): SemanticAtom {
 }
 
 export function createRequirement(description: string, acceptanceCriteria: string[]): FunctionalityRequirement {
+    const requirementMeta: FunctionalityRequirement['meta'] = {
+        type: 'dev/requirement',
+        description,
+        acceptanceCriteria,
+    };
+
     const atom = createAtom(
         { description },
         {
-            type: 'dev/requirement',
-            description,
-            acceptanceCriteria,
+            type: 'Fact',
+            source: 'manual',
             timestamp: new Date().toISOString(),
+            author: 'developer',
+            trust_score: 1.0,
+            domain: 'development',
+            license: 'internal',
+            // Add the requirement meta here for semantic search purposes
+            description: requirementMeta.description,
+            acceptanceCriteria: requirementMeta.acceptanceCriteria,
         }
     );
 
@@ -90,6 +102,6 @@ export function createRequirement(description: string, acceptanceCriteria: strin
             schema_id: 'manual/requirement-creation' as UUID,
         },
         goal_status: 'active',
-        meta: atom.meta,
-    } as FunctionalityRequirement;
+        meta: requirementMeta,
+    };
 }

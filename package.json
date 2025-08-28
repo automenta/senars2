@@ -26,6 +26,10 @@
     "url": "https://github.com/automenta/senars2/issues"
   },
   "homepage": "https://github.com/automenta/senars2#readme",
+  "workspaces": [
+    "frontend",
+    "packages/*"
+  ],
   "dependencies": {
     "@cognitive-arch/types": "file:packages/types",
     "@types/jest": "^30.0.0",
